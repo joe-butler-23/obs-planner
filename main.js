@@ -25170,6 +25170,8 @@ var WeeklyOrganiserBoard = ({ app }) => {
   const isInternalUpdateRef = React.useRef(false);
   const lastDragTimeRef = React.useRef(0);
   const [weekOffset, setWeekOffset] = React.useState(0);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const calendarInputRef = React.useRef(null);
   const boardId = React.useMemo(
     () => `weekly-organiser-board-${Math.random().toString(36).slice(2, 11)}`,
     []
@@ -25383,7 +25385,67 @@ var WeeklyOrganiserBoard = ({ app }) => {
   const startDate = momentFn2().add(weekOffset, "weeks").startOf("isoWeek");
   const endDate = startDate.clone().add(6, "days");
   const weekRangeDisplay = `${startDate.format("MMM Do")} - ${endDate.format("MMM Do, YYYY")}`;
-  return /* @__PURE__ */ React.createElement("div", { className: "weekly-organiser-container" }, /* @__PURE__ */ React.createElement("div", { className: "organiser-header" }, /* @__PURE__ */ React.createElement("div", { className: "week-nav" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOffset((prev) => prev - 1) }, "<"), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOffset(0) }, "Today"), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOffset((prev) => prev + 1) }, ">")), /* @__PURE__ */ React.createElement("h2", null, weekRangeDisplay)), /* @__PURE__ */ React.createElement(
+  const startDateValue = startDate.format("YYYY-MM-DD");
+  React.useEffect(() => {
+    if (!isCalendarOpen) return;
+    const input = calendarInputRef.current;
+    if (!input) return;
+    requestAnimationFrame(() => {
+      input.focus();
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      } else {
+        input.click();
+      }
+    });
+  }, [isCalendarOpen]);
+  const handleCalendarChange = (value) => {
+    if (!value) return;
+    const selected = momentFn2(value);
+    if (!selected.isValid()) return;
+    const offset = selected.startOf("isoWeek").diff(momentFn2().startOf("isoWeek"), "weeks");
+    setWeekOffset(offset);
+    setIsCalendarOpen(false);
+  };
+  return /* @__PURE__ */ React.createElement("div", { className: "weekly-organiser-container" }, /* @__PURE__ */ React.createElement("div", { className: "organiser-header" }, /* @__PURE__ */ React.createElement("div", { className: "week-nav" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOffset((prev) => prev - 1) }, "<"), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOffset(0) }, "Today"), /* @__PURE__ */ React.createElement("div", { className: "week-nav-calendar" }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "calendar-toggle",
+      "aria-label": "Choose week",
+      onClick: () => setIsCalendarOpen((prev) => !prev),
+      type: "button"
+    },
+    /* @__PURE__ */ React.createElement(
+      "svg",
+      {
+        "aria-hidden": "true",
+        viewBox: "0 0 24 24",
+        width: "16",
+        height: "16",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round"
+      },
+      /* @__PURE__ */ React.createElement("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2", ry: "2" }),
+      /* @__PURE__ */ React.createElement("line", { x1: "16", y1: "2", x2: "16", y2: "6" }),
+      /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "2", x2: "8", y2: "6" }),
+      /* @__PURE__ */ React.createElement("line", { x1: "3", y1: "10", x2: "21", y2: "10" })
+    )
+  ), isCalendarOpen && /* @__PURE__ */ React.createElement("div", { className: "calendar-popover" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      ref: calendarInputRef,
+      type: "date",
+      "aria-label": "Choose week",
+      value: startDateValue,
+      onChange: (event) => handleCalendarChange(
+        event.target.value
+      ),
+      onBlur: () => setIsCalendarOpen(false)
+    }
+  ))), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOffset((prev) => prev + 1) }, ">")), /* @__PURE__ */ React.createElement("h2", null, weekRangeDisplay)), /* @__PURE__ */ React.createElement(
     "div",
     {
       id: boardId,

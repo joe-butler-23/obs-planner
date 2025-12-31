@@ -126,6 +126,8 @@ export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
 	const isInternalUpdateRef = React.useRef(false);
 	const lastDragTimeRef = React.useRef(0);
 	const [weekOffset, setWeekOffset] = React.useState(0);
+	const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+	const calendarInputRef = React.useRef<HTMLInputElement>(null);
 
 	const boardId = React.useMemo(
 		() => `weekly-organiser-board-${Math.random().toString(36).slice(2, 11)}`,
@@ -400,6 +402,35 @@ export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
 		.startOf("isoWeek");
 	const endDate = startDate.clone().add(6, "days");
 	const weekRangeDisplay = `${startDate.format("MMM Do")} - ${endDate.format("MMM Do, YYYY")}`;
+	const startDateValue = startDate.format("YYYY-MM-DD");
+
+	React.useEffect(() => {
+		if (!isCalendarOpen) return;
+		const input = calendarInputRef.current as
+			| (HTMLInputElement & { showPicker?: () => void })
+			| null;
+		if (!input) return;
+
+		requestAnimationFrame(() => {
+			input.focus();
+			if (typeof input.showPicker === "function") {
+				input.showPicker();
+			} else {
+				input.click();
+			}
+		});
+	}, [isCalendarOpen]);
+
+	const handleCalendarChange = (value: string) => {
+		if (!value) return;
+		const selected = momentFn(value);
+		if (!selected.isValid()) return;
+		const offset = selected
+			.startOf("isoWeek")
+			.diff(momentFn().startOf("isoWeek"), "weeks");
+		setWeekOffset(offset);
+		setIsCalendarOpen(false);
+	};
 
 	return (
 		<div className="weekly-organiser-container">
@@ -409,6 +440,49 @@ export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
 						&lt;
 					</button>
 					<button onClick={() => setWeekOffset(0)}>Today</button>
+					<div className="week-nav-calendar">
+						<button
+							className="calendar-toggle"
+							aria-label="Choose week"
+							onClick={() =>
+								setIsCalendarOpen((prev) => !prev)
+							}
+							type="button"
+						>
+							<svg
+								aria-hidden="true"
+								viewBox="0 0 24 24"
+								width="16"
+								height="16"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+								<line x1="16" y1="2" x2="16" y2="6" />
+								<line x1="8" y1="2" x2="8" y2="6" />
+								<line x1="3" y1="10" x2="21" y2="10" />
+							</svg>
+						</button>
+						{isCalendarOpen && (
+							<div className="calendar-popover">
+								<input
+									ref={calendarInputRef}
+									type="date"
+									aria-label="Choose week"
+									value={startDateValue}
+									onChange={(event) =>
+										handleCalendarChange(
+											event.target.value
+										)
+									}
+									onBlur={() => setIsCalendarOpen(false)}
+								/>
+							</div>
+						)}
+					</div>
 					<button onClick={() => setWeekOffset((prev) => prev + 1)}>
 						&gt;
 					</button>

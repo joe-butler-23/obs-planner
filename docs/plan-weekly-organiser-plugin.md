@@ -13,11 +13,10 @@
 - [x] Add Ribbon Icon
 
 ## Phase 3: React UI Development
-- [x] Create `OrganiserComponent.tsx`
-- [x] Implement `Card` component
-- [x] Implement reusable `KanbanColumn` component
-- [x] Implement reusable `useKanbanDragAndDrop` hook
-- [x] Integrate FormKit drag-and-drop (insert + animations)
+- [x] Create `WeeklyOrganiserBoard.tsx`
+- [x] Render cards via a dedicated HTML renderer
+- [x] Integrate jKanban drag-and-drop (Dragula-based)
+- [x] Add delegated click handling for ctrl/cmd image open in right split
 
 ## Phase 4: Data Layer
 - [x] Implement data loading/saving logic
@@ -31,14 +30,13 @@
 - [x] Setup Jest + React Testing Library
 - [x] Write unit tests for data logic (parsing frontmatter)
 - [x] Write component tests for Drag & Drop interactions
-- [x] Migrated to `@formkit/drag-and-drop` for smoother drag-and-drop and insert indicators
+- [x] Migrated to jKanban for simpler drag-and-drop behavior
 
 ## Architecture Approach
-- Keep drag-and-drop logic modular and composable via a dedicated hook + column component.
+- Keep drag-and-drop logic modular in a dedicated board component.
 - Scope DOM queries to the organiser container to avoid cross-feature interference.
-- Diff refresh results before setting state to avoid redundant renders and DnD churn.
-- Use FormKit insert events to ensure transfers into empty columns update frontmatter.
-- Clean up drop indicators on drag leave to avoid lingering UI artifacts.
+- Rebuild jKanban on refresh to keep Dragula containers in sync.
+- Use delegated click handling to preserve ctrl/cmd click intent during DnD.
 
 ## Human-in-the-Loop Workflow
 - [x] Development Build

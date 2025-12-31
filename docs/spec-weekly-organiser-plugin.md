@@ -12,15 +12,16 @@ A weekly organiser plugin for Obsidian that allows users to plan their week by d
 ## Technical Requirements
 - Language: TypeScript
 - UI Framework: React
-- Drag & Drop: @formkit/drag-and-drop (React bindings)
+- Drag & Drop: jKanban (Dragula-based)
 - Storage: Vault frontmatter (`scheduled`, `marked`) on recipe/exercise notes
   - `scheduled`: YYYY-MM-DD string for day columns
   - `marked`: boolean for the backlog column
   - Legacy fallback: read `date` if `scheduled` is absent
+- Click behavior: ctrl/cmd + click on card image opens in right split; standard click opens in right split; ignore clicks immediately after drag.
 
 ## Architecture Principles
 - Modular, composable components and hooks so DnD logic is isolated and reusable.
 - Namespaced DnD classes to reduce style collisions across the app.
 - Scoped DOM queries via container refs to avoid cross-feature interference.
 - Avoid redundant state updates during refreshes to reduce render churn.
-- Use FormKit insert events to handle drops into empty columns.
+- Rebuild jKanban on refresh to keep Dragula containers in sync.
