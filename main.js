@@ -29931,7 +29931,7 @@ var generateWeekColumns = (weekOffset) => {
     const date = startOfWeek.clone().add(i, "days");
     dayColumns.push({
       id: date.format("YYYY-MM-DD"),
-      title: date.format("ddd Do"),
+      title: date.format("ddd Do MMM"),
       fieldValue: date.format("YYYY-MM-DD")
     });
   }
@@ -30372,6 +30372,9 @@ var usePikadayDatePicker = (options) => {
     }
     picker.show();
     pickerRef.current = picker;
+    container.querySelectorAll(".pika-table abbr[title]").forEach((abbr) => {
+      abbr.removeAttribute("title");
+    });
     return () => {
       picker.destroy();
       pickerRef.current = null;
@@ -30555,7 +30558,7 @@ var WeeklyOrganiserBoard = ({ app }) => {
       },
       "Clear"
     ))
-  )), /* @__PURE__ */ React3.createElement("button", { onClick: () => setWeekOffset((prev) => prev + 1) }, ">")), /* @__PURE__ */ React3.createElement("h2", null, weekRangeDisplay)), /* @__PURE__ */ React3.createElement(
+  )), /* @__PURE__ */ React3.createElement("button", { onClick: () => setWeekOffset((prev) => prev + 1) }, ">"), /* @__PURE__ */ React3.createElement("span", { className: "week-range" }, weekRangeDisplay))), /* @__PURE__ */ React3.createElement(
     "div",
     {
       id: boardId,

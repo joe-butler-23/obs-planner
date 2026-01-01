@@ -19,7 +19,6 @@
 	top: 0;
 	z-index: 2;
 	display: flex;
-	justify-content: space-between;
 	align-items: center;
 	margin-bottom: 16px;
 	padding: 8px 10px 12px;
@@ -27,14 +26,15 @@
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.organiser-header h2 {
-	margin: 0;
-	font-size: 1.1em;
-	letter-spacing: 0.01em;
+.week-range {
+	margin-left: 12px;
+	font-size: 0.95em;
+	color: var(--text-muted);
 }
 
 .week-nav {
 	display: flex;
+	align-items: center;
 	gap: 8px;
 }
 
@@ -344,7 +344,7 @@
 }
 
 .kanban-board header {
-	margin: 6px 8px 10px;
+	margin: 4px 8px 6px;
 	font-size: 0.8em;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
@@ -420,6 +420,11 @@
 	overflow: hidden;
 	aspect-ratio: 1 / 1;
 	background-color: var(--background-secondary);
+}
+
+/* Half-height cards when 2+ in a day column (not marked column) */
+.kanban-board:not([data-id="marked"]) .kanban-drag:has(> :nth-child(2)) .card-cover {
+	aspect-ratio: 2 / 1;
 }
 
 .card-cover img {

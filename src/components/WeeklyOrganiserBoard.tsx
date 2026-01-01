@@ -218,8 +218,8 @@ export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
 					<button onClick={() => setWeekOffset((prev) => prev + 1)}>
 						&gt;
 					</button>
+					<span className="week-range">{weekRangeDisplay}</span>
 				</div>
-				<h2>{weekRangeDisplay}</h2>
 			</div>
 			<div
 				id={boardId}

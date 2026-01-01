@@ -60,6 +60,11 @@ export const usePikadayDatePicker = (
 		picker.show();
 		pickerRef.current = picker;
 
+		// Remove tooltips from day abbreviations
+		container.querySelectorAll(".pika-table abbr[title]").forEach((abbr) => {
+			abbr.removeAttribute("title");
+		});
+
 		return () => {
 			picker.destroy();
 			pickerRef.current = null;
