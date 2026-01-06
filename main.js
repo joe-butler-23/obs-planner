@@ -31513,6 +31513,7 @@ var WeeklyOrganiserView = class extends import_obsidian7.ItemView {
   }
   async onOpen() {
     this.contentEl.empty();
+    console.log("[WeeklyOrganiserView] onOpen");
     this.root = (0, import_client.createRoot)(this.contentEl);
     this.root.render(
       /* @__PURE__ */ React4.createElement(React4.StrictMode, null, /* @__PURE__ */ React4.createElement("div", { className: "weekly-organiser-view-container" }, /* @__PURE__ */ React4.createElement(WeeklyOrganiserBoard, { app: this.app })))
@@ -31520,6 +31521,7 @@ var WeeklyOrganiserView = class extends import_obsidian7.ItemView {
   }
   async onClose() {
     var _a;
+    console.log("[WeeklyOrganiserView] onClose");
     (_a = this.root) == null ? void 0 : _a.unmount();
   }
 };

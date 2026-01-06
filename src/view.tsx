@@ -26,6 +26,7 @@ export class WeeklyOrganiserView extends ItemView {
 
 	async onOpen() {
 		this.contentEl.empty();
+		console.log("[WeeklyOrganiserView] onOpen");
 		this.root = createRoot(this.contentEl);
 		this.root.render(
 			<React.StrictMode>
@@ -37,6 +38,7 @@ export class WeeklyOrganiserView extends ItemView {
 	}
 
 	async onClose() {
+		console.log("[WeeklyOrganiserView] onClose");
 		this.root?.unmount();
 	}
 }
