@@ -249,7 +249,9 @@ const PREP_PHRASES = [
   "thinly",
   "thickly",
   "chopped",
+  "choppeds",
   "minced",
+  "minceds",
   "sliced",
   "diced",
   "grated",
@@ -365,7 +367,7 @@ const sanitizeIngredientName = (value: string): string => {
     }
   }
 
-  return normalizeSpaces(cleaned);
+  return normalizeSpaces(cleaned).toLowerCase();
 };
 
 const convertToMetric = (
@@ -434,7 +436,7 @@ const formatMetricQuantity = (
   if (unit === "ml" && quantity >= 1000) {
     const litres = quantity / 1000;
     const rounded = Number.isInteger(litres) ? litres : Number(litres.toFixed(2));
-    return `${rounded}L`;
+    return `${rounded}l`;
   }
   const rounded = Math.round(quantity);
   return `${rounded}${unit}`;
@@ -457,8 +459,10 @@ export const parseIngredientLine = (line: string): ParsedIngredient | null => {
   const tokens = cleaned.split(" ");
   const { quantity, consumed } = parseQuantity(tokens);
   if (quantity === null) {
+    const sanitizedName = sanitizeIngredientName(cleaned);
+    if (!sanitizedName) return null;
     return {
-      displayName: cleaned,
+      displayName: sanitizedName,
       quantity: null,
       unit: null
     };
@@ -540,7 +544,7 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
   const items: ShoppingItem[] = [];
   for (const entry of aggregated.values()) {
     const recipeList = Array.from(entry.sources);
-    const recipeLabel = recipeList.join(", ");
+    const recipeLabel = recipeList.map((recipe) => recipe.toLowerCase()).join(", ");
 
     if (entry.quantity === null || entry.unit === null) {
       const content = recipeLabel

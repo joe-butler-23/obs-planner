@@ -28,18 +28,18 @@ describe("TodoistShoppingListService helpers", () => {
       { path: "b.md", title: "Recipe B", ingredients: ["2 onions", "salt"] }
     ]);
     const onion = items.find((item) => item.content.includes("onion"));
-    expect(onion?.content).toBe("onions - 3 - Recipe A, Recipe B");
+    expect(onion?.content).toBe("onions - 3 - recipe a, recipe b");
     const salt = items.filter((item) => item.content === "salt");
     expect(salt).toHaveLength(0);
     const saltItem = items.find((item) => item.content.startsWith("salt -"));
-    expect(saltItem?.content).toBe("salt - Recipe A, Recipe B");
+    expect(saltItem?.content).toBe("salt - recipe a, recipe b");
   });
 
   it("converts imperial units to metric", () => {
     const items = buildShoppingItems([
       { path: "c.md", title: "Recipe C", ingredients: ["1 lb flour"] }
     ]);
-    expect(items[0].content).toBe("flour - 454g - Recipe C");
+    expect(items[0].content).toBe("flour - 454g - recipe c");
   });
 
   it("labels common produce", () => {
@@ -58,8 +58,8 @@ describe("TodoistShoppingListService helpers", () => {
       }
     ]);
     const carrot = items.find((item) => item.content.startsWith("carrots -"));
-    expect(carrot?.content).toBe("carrots - 250g - Beanotto");
+    expect(carrot?.content).toBe("carrots - 250g - beanotto");
     const stock = items.find((item) => item.content.startsWith("veg stock -"));
-    expect(stock?.content).toBe("veg stock - 500ml - Beanotto");
+    expect(stock?.content).toBe("veg stock - 500ml - beanotto");
   });
 });
