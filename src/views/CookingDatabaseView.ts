@@ -17,7 +17,9 @@ export class CookingDatabaseView extends ItemView {
   private headerCountEl: HTMLDivElement | null = null;
   private gridEl: HTMLDivElement | null = null;
   private searchInput: HTMLInputElement | null = null;
-  private tagSelect: HTMLSelectElement | null = null;
+  private tagButton: HTMLButtonElement | null = null;
+  private tagMenu: HTMLDivElement | null = null;
+  private tagMenuOpen = false;
   private markedSelect: HTMLSelectElement | null = null;
   private scheduledSelect: HTMLSelectElement | null = null;
   private sortSelect: HTMLSelectElement | null = null;
@@ -101,6 +103,7 @@ export class CookingDatabaseView extends ItemView {
     contentEl.addClass("cooking-db");
     const minWidth = Math.max(160, this.plugin.settings.databaseCardMinWidth || 220);
     contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
+    contentEl.style.setProperty("--cooking-db-card-size", `${minWidth}px`);
 
     const header = contentEl.createEl("div", { cls: "cooking-db__header" });
     header.createEl("h2", { text: "Recipe Database" });
@@ -144,30 +147,30 @@ export class CookingDatabaseView extends ItemView {
       this.scheduleRender();
     });
 
-    this.tagSelect = controls.createEl("select", {
-      cls: "cooking-db__select cooking-db__select--tags",
-      attr: { multiple: "true" }
+    const tagWrapper = controls.createEl("div", { cls: "cooking-db__tag-filter" });
+    this.tagButton = tagWrapper.createEl("button", {
+      cls: "cooking-db__tag-toggle",
+      attr: {
+        type: "button",
+        "aria-haspopup": "listbox",
+        "aria-expanded": "false"
+      },
+      text: "Tags: all"
     });
-    this.tagSelect.size = 1;
-    this.tagSelect.addEventListener("change", () => {
-      if (!this.tagSelect) return;
-      const selected = Array.from(this.tagSelect.selectedOptions).map(
-        (option) => option.value
-      );
-      if (selected.includes("all")) {
-        this.currentTags = [];
-        Array.from(this.tagSelect.options).forEach((option) => {
-          option.selected = option.value === "all";
-        });
-      } else {
-        this.currentTags = selected.filter(Boolean);
-        if (this.currentTags.length === 0) {
-          Array.from(this.tagSelect.options).forEach((option) => {
-            option.selected = option.value === "all";
-          });
-        }
-      }
-      this.scheduleRender();
+    this.tagButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.toggleTagMenu();
+    });
+
+    this.tagMenu = tagWrapper.createEl("div", {
+      cls: "cooking-db__tag-menu",
+      attr: { role: "listbox" }
+    });
+    this.tagMenu.hidden = true;
+    this.tagMenu.addEventListener("click", (event) => event.stopPropagation());
+
+    this.registerDomEvent(document, "click", () => {
+      this.setTagMenuOpen(false);
     });
 
     this.markedSelect = controls.createEl("select", { cls: "cooking-db__select" });
@@ -236,6 +239,7 @@ export class CookingDatabaseView extends ItemView {
 
     const minWidth = Math.max(160, settings.databaseCardMinWidth || 220);
     this.contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
+    this.contentEl.style.setProperty("--cooking-db-card-size", `${minWidth}px`);
 
     const scrollTop = this.contentEl.scrollTop;
 
@@ -394,24 +398,72 @@ export class CookingDatabaseView extends ItemView {
   }
 
   private updateTagOptions(tags: string[]) {
-    if (!this.tagSelect) return;
-    const previous = this.currentTags.filter((tag) => tags.includes(tag));
-    this.tagSelect.replaceChildren();
-    const allOption = document.createElement("option");
-    allOption.value = "all";
-    allOption.textContent = "All tags";
-    this.tagSelect.appendChild(allOption);
+    if (!this.tagMenu || !this.tagButton) return;
+    const available = new Set(tags);
+    this.currentTags = this.currentTags.filter((tag) => available.has(tag));
+
+    this.tagMenu.replaceChildren();
+    this.tagMenu.appendChild(
+      this.createTagOption("All tags", "__all__", this.currentTags.length === 0)
+    );
     tags.forEach((tag) => {
-      const option = document.createElement("option");
-      option.value = tag;
-      option.textContent = tag;
-      option.selected = previous.includes(tag);
-      this.tagSelect?.appendChild(option);
+      this.tagMenu?.appendChild(
+        this.createTagOption(tag, tag, this.currentTags.includes(tag))
+      );
     });
-    if (previous.length === 0) {
-      allOption.selected = true;
+
+    this.updateTagButtonLabel();
+  }
+
+  private createTagOption(label: string, value: string, checked: boolean) {
+    const row = document.createElement("label");
+    row.className = "cooking-db__tag-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = value;
+    checkbox.checked = checked;
+    checkbox.addEventListener("change", () => {
+      if (value === "__all__") {
+        this.currentTags = [];
+      } else {
+        const set = new Set(this.currentTags);
+        if (checkbox.checked) {
+          set.add(value);
+        } else {
+          set.delete(value);
+        }
+        this.currentTags = Array.from(set);
+      }
+      this.scheduleRender();
+    });
+    const text = document.createElement("span");
+    text.textContent = label;
+    row.append(checkbox, text);
+    return row;
+  }
+
+  private updateTagButtonLabel() {
+    if (!this.tagButton) return;
+    if (this.currentTags.length === 0) {
+      this.tagButton.textContent = "Tags: all";
+      return;
     }
-    this.currentTags = previous;
+    if (this.currentTags.length === 1) {
+      this.tagButton.textContent = `Tags: ${this.currentTags[0]}`;
+      return;
+    }
+    this.tagButton.textContent = `Tags: ${this.currentTags.length} selected`;
+  }
+
+  private toggleTagMenu() {
+    this.setTagMenuOpen(!this.tagMenuOpen);
+  }
+
+  private setTagMenuOpen(open: boolean) {
+    if (!this.tagMenu || !this.tagButton) return;
+    this.tagMenuOpen = open;
+    this.tagMenu.hidden = !open;
+    this.tagButton.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
   private createEmpty(message: string) {

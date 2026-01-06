@@ -144,6 +144,10 @@ describe("RecipeIndexService", () => {
     expect(filtered).toHaveLength(1);
     expect(filtered[0].path).toBe("recipes/alpha.md");
 
+    const filteredMulti = service.getRecipes({ filter: { tags: ["soup", "winter"] } });
+    expect(filteredMulti).toHaveLength(1);
+    expect(filteredMulti[0].path).toBe("recipes/alpha.md");
+
     const searched = service.getRecipes({ search: "sal" });
     expect(searched).toHaveLength(1);
     expect(searched[0].path).toBe("recipes/beta.md");
