@@ -215,10 +215,7 @@
 
 .cooking-db__grid {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(var(--cooking-db-card-min, 200px), var(--cooking-db-card-max, 260px))
-  );
+  grid-template-columns: repeat(auto-fill, var(--cooking-db-card-size, 220px));
   gap: 12px;
   justify-content: start;
 }
@@ -234,7 +231,9 @@
   transition: transform 0.1s ease, box-shadow 0.1s ease;
   content-visibility: auto;
   contain: layout style paint;
-  width: 100%;
+  width: var(--cooking-db-card-size, 220px);
+  height: calc(var(--cooking-db-card-size, 220px) + var(--cooking-db-card-body, 110px));
+  justify-self: start;
 }
 
 .cooking-db__card:hover {
@@ -249,6 +248,7 @@
   align-items: center;
   justify-content: center;
   width: 100%;
+  height: var(--cooking-db-card-size, 220px);
   flex: 0 0 auto;
 }
 

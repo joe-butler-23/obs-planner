@@ -60,6 +60,8 @@ export class CookingDatabaseView extends ItemView {
     this.registerEvent(this.app.vault.on("rename", () => this.scheduleRender()));
     this.registerEvent(this.app.metadataCache.on("changed", () => this.scheduleRender()));
 
+    this.registerDomEvent(window, "resize", () => this.scheduleRender());
+
     this.registerInterval(window.setInterval(() => this.scheduleRender(), 60_000));
   }
 
@@ -107,6 +109,7 @@ export class CookingDatabaseView extends ItemView {
     const maxWidth = Math.max(minWidth, scaledBase + 28);
     contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
     contentEl.style.setProperty("--cooking-db-card-max", `${maxWidth}px`);
+    contentEl.style.setProperty("--cooking-db-card-size", `${scaledBase}px`);
 
     const header = contentEl.createEl("div", { cls: "cooking-db__header" });
     header.createEl("h2", { text: "Recipe Database" });
@@ -247,6 +250,7 @@ export class CookingDatabaseView extends ItemView {
     const maxWidth = Math.max(minWidth, scaledBase + 28);
     this.contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
     this.contentEl.style.setProperty("--cooking-db-card-max", `${maxWidth}px`);
+    this.updateCardSize(minWidth, maxWidth);
 
     const scrollTop = this.contentEl.scrollTop;
 
@@ -299,9 +303,7 @@ export class CookingDatabaseView extends ItemView {
       meta.className = "cooking-db__meta";
       const metaParts = [];
       const added = formatDate(recipe.added);
-      const scheduled = formatDate(recipe.scheduled);
       if (added) metaParts.push(`Added ${added}`);
-      if (scheduled) metaParts.push(`Scheduled ${scheduled}`);
       meta.textContent = metaParts.join(" | ");
 
       const actions = document.createElement("div");
@@ -470,7 +472,43 @@ export class CookingDatabaseView extends ItemView {
     if (!this.tagMenu || !this.tagButton) return;
     this.tagMenuOpen = open;
     this.tagMenu.hidden = !open;
+    this.tagMenu.style.display = open ? "grid" : "none";
     this.tagButton.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  private updateCardSize(minWidth: number, maxWidth: number) {
+    if (!this.gridEl) return;
+    const containerWidth = this.gridEl.clientWidth;
+    if (!containerWidth) return;
+    const gap = 12;
+    const maxColumns = Math.max(
+      1,
+      Math.floor((containerWidth + gap) / (minWidth + gap))
+    );
+
+    let bestWidth = minWidth;
+    let bestWhitespace = Number.POSITIVE_INFINITY;
+
+    for (let cols = 1; cols <= maxColumns; cols += 1) {
+      const rawWidth = (containerWidth - gap * (cols - 1)) / cols;
+      const width = Math.floor(rawWidth);
+      if (width < minWidth || width > maxWidth) continue;
+      const used = width * cols + gap * (cols - 1);
+      const whitespace = containerWidth - used;
+      if (whitespace < bestWhitespace) {
+        bestWhitespace = whitespace;
+        bestWidth = width;
+      }
+    }
+
+    if (!Number.isFinite(bestWhitespace)) {
+      const width = Math.floor(
+        (containerWidth - gap * (maxColumns - 1)) / maxColumns
+      );
+      bestWidth = Math.max(minWidth, Math.min(maxWidth, width));
+    }
+
+    this.contentEl.style.setProperty("--cooking-db-card-size", `${bestWidth}px`);
   }
 
   private createEmpty(message: string) {
