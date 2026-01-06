@@ -18,6 +18,13 @@ const SESSION_LOG_PATH = path.join(
   "resources",
   "todoist-session.json"
 );
+const PREVIEW_LOG_PATH = path.join(
+  os.homedir(),
+  "projects",
+  "sys-arc",
+  "resources",
+  "todoist-preview.md"
+);
 
 type RecipeSource = {
   path: string;
@@ -35,12 +42,14 @@ type ParsedIngredient = {
   displayName: string;
   quantity: number | null;
   unit: "g" | "ml" | "count" | null;
+  countUnit: string | null;
 };
 
 type AggregatedItem = {
   displayName: string;
   quantity: number | null;
   unit: "g" | "ml" | "count" | null;
+  countUnit: string | null;
   label: string;
   sources: Set<string>;
 };
@@ -56,6 +65,8 @@ type ConfirmSummary = {
   itemCount: number;
   baselineCount: number;
 };
+
+type TodoistAction = "send" | "preview" | "cancel";
 
 const UNIT_ALIASES: Record<string, string> = {
   g: "g",
@@ -115,6 +126,8 @@ const LABEL_RULES: Array<{ label: string; keywords: string[] }> = [
       "courgette",
       "zucchini",
       "cabbage",
+      "brussels sprout",
+      "brussels sprouts",
       "broccoli",
       "cauliflower",
       "herb",
@@ -123,6 +136,7 @@ const LABEL_RULES: Array<{ label: string; keywords: string[] }> = [
       "coriander",
       "cilantro",
       "mint",
+      "dill",
       "sage",
       "thyme",
       "rosemary",
@@ -133,7 +147,8 @@ const LABEL_RULES: Array<{ label: string; keywords: string[] }> = [
       "scallion",
       "shallot",
       "leek",
-      "celery"
+      "celery",
+      "orange"
     ]
   },
   {
@@ -148,6 +163,7 @@ const LABEL_RULES: Array<{ label: string; keywords: string[] }> = [
       "parmesan",
       "mozzarella",
       "cheddar",
+      "feta",
       "egg",
       "eggs"
     ]
@@ -269,11 +285,86 @@ const PREP_PHRASES = [
   "to taste"
 ];
 
+const WATER_DESCRIPTORS = new Set([
+  "cold",
+  "warm",
+  "hot",
+  "boiling",
+  "ice",
+  "iced",
+  "filtered",
+  "tap",
+  "still",
+  "sparkling"
+]);
+
 const INGREDIENT_ALIASES: Array<{ pattern: RegExp; replacement: string }> = [
   { pattern: /\bvegetable\s+stock\b/i, replacement: "veg stock" },
   { pattern: /\bvegetable\s+broth\b/i, replacement: "veg stock" },
-  { pattern: /\bveg(?:etable)?\s+stock\b/i, replacement: "veg stock" }
+  { pattern: /\bveg(?:etable)?\s+stock\b/i, replacement: "veg stock" },
+  { pattern: /\bparmesan\s+cheese\b/i, replacement: "parmesan" },
+  { pattern: /\bfeta\s+cheese\b/i, replacement: "feta" }
 ];
+
+const COUNT_UNIT_ALIASES: Record<string, string> = {
+  clove: "clove",
+  cloves: "clove",
+  sprig: "sprig",
+  sprigs: "sprig",
+  bunch: "bunch",
+  bunches: "bunch",
+  stalk: "stalk",
+  stalks: "stalk",
+  stick: "stick",
+  sticks: "stick",
+  can: "can",
+  cans: "can",
+  tin: "tin",
+  tins: "tin",
+  jar: "jar",
+  jars: "jar",
+  pack: "pack",
+  packs: "pack",
+  bag: "bag",
+  bags: "bag",
+  piece: "piece",
+  pieces: "piece",
+  slice: "slice",
+  slices: "slice",
+  leaf: "leaf",
+  leaves: "leaf"
+};
+
+const LABEL_OVERRIDES: Record<string, string> = {
+  "butter bean": "tinned-jarred-dried",
+  "butter beans": "tinned-jarred-dried",
+  "brussels sprout": "fruit-and-veg",
+  "brussels sprouts": "fruit-and-veg"
+};
+
+const STOP_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "with",
+  "of",
+  "to",
+  "for",
+  "in",
+  "on",
+  "at",
+  "from",
+  "by",
+  "plus",
+  "into",
+  "over",
+  "under",
+  "between",
+  "without",
+  "as"
+]);
 
 export const parseIngredientsSection = (markdown: string): string[] => {
   const lines = markdown.split(/\r?\n/);
@@ -346,6 +437,12 @@ const normalizeUnitToken = (token: string | undefined): string | null => {
   return UNIT_ALIASES[cleaned] ?? null;
 };
 
+const normalizeCountUnitToken = (token: string | undefined): string | null => {
+  if (!token) return null;
+  const cleaned = token.toLowerCase().replace(/[.,]/g, "");
+  return COUNT_UNIT_ALIASES[cleaned] ?? null;
+};
+
 const sanitizeIngredientName = (value: string): string => {
   let cleaned = value;
 
@@ -368,6 +465,17 @@ const sanitizeIngredientName = (value: string): string => {
   }
 
   return normalizeSpaces(cleaned).toLowerCase();
+};
+
+const abbreviateRecipeTitle = (title: string): string => {
+  const words = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const filtered = words.filter((word) => !STOP_WORDS.has(word));
+  const selected = (filtered.length > 0 ? filtered : words).slice(0, 3);
+  return selected.join(" ");
 };
 
 const convertToMetric = (
@@ -442,14 +550,32 @@ const formatMetricQuantity = (
   return `${rounded}${unit}`;
 };
 
+const formatCountQuantity = (quantity: number, unit: string | null): string => {
+  const rounded = Number.isInteger(quantity) ? quantity : Number(quantity.toFixed(2));
+  if (!unit) return `${rounded}`;
+  const resolvedUnit = rounded === 1 ? unit : `${unit}s`;
+  return `${rounded} ${resolvedUnit}`;
+};
+
 export const labelForIngredient = (name: string): string => {
-  const normalized = name.toLowerCase();
+  const normalized = normalizeNameForKey(name);
+  const override = LABEL_OVERRIDES[normalized];
+  if (override) return override;
   for (const rule of LABEL_RULES) {
     if (rule.keywords.some((keyword) => normalized.includes(keyword))) {
       return rule.label;
     }
   }
   return DEFAULT_LABEL;
+};
+
+const isWaterIngredient = (name: string): boolean => {
+  const normalized = normalizeNameForKey(name);
+  if (!normalized.includes("water")) return false;
+  if (normalized === "water") return true;
+  const words = normalized.split(" ").filter(Boolean);
+  const filtered = words.filter((word) => word !== "water" && !WATER_DESCRIPTORS.has(word));
+  return filtered.length === 0;
 };
 
 export const parseIngredientLine = (line: string): ParsedIngredient | null => {
@@ -461,41 +587,66 @@ export const parseIngredientLine = (line: string): ParsedIngredient | null => {
   if (quantity === null) {
     const sanitizedName = sanitizeIngredientName(cleaned);
     if (!sanitizedName) return null;
+    if (isWaterIngredient(sanitizedName)) return null;
     return {
       displayName: sanitizedName,
       quantity: null,
-      unit: null
+      unit: null,
+      countUnit: null
     };
   }
 
   let unitToken: string | null = null;
+  let countUnit: string | null = null;
   let nameStart = consumed;
+  let consumedUnit = false;
 
   if (consumed === 1) {
     const attachedMatch = tokens[0].match(/^(\d+(?:\.\d+)?)([a-zA-Z]+)$/);
     if (attachedMatch) {
       unitToken = normalizeUnitToken(attachedMatch[2]);
+      if (!unitToken) {
+        countUnit = normalizeCountUnitToken(attachedMatch[2]);
+      }
       nameStart = 1;
+      consumedUnit = Boolean(unitToken || countUnit);
     }
   }
 
-  if (!unitToken) {
+  if (!consumedUnit) {
     unitToken = normalizeUnitToken(tokens[consumed]);
     if (unitToken) {
       nameStart = consumed + 1;
+    } else {
+      countUnit = normalizeCountUnitToken(tokens[consumed]);
+      if (countUnit) {
+        nameStart = consumed + 1;
+      }
     }
+  }
+
+  if (tokens[nameStart]?.toLowerCase() === "of") {
+    nameStart += 1;
   }
 
   const name = normalizeSpaces(tokens.slice(nameStart).join(" "));
   const sanitizedName = sanitizeIngredientName(name);
   if (!sanitizedName) return null;
+  if (isWaterIngredient(sanitizedName)) return null;
 
   const metric = convertToMetric(quantity, unitToken);
   return {
     displayName: sanitizedName,
     quantity: metric.quantity,
-    unit: metric.unit
+    unit: unitToken ? metric.unit : "count",
+    countUnit
   };
+};
+
+const createRecipeLabel = (titles: string[]) => {
+  const abbreviated = titles.map(abbreviateRecipeTitle).filter(Boolean);
+  if (abbreviated.length === 0) return "";
+  return `[${abbreviated.join(", ")}]`;
 };
 
 export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
@@ -506,14 +657,22 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
       const parsed = parseIngredientLine(line);
       if (!parsed) continue;
 
+      const keyName = normalizeNameForKey(parsed.displayName);
+      const keySuffix =
+        parsed.quantity === null || parsed.unit === null
+          ? "none"
+          : parsed.unit === "count"
+            ? `count:${parsed.countUnit ?? "count"}`
+            : parsed.unit;
+      const key = `${keyName}|${keySuffix}`;
+
       if (parsed.quantity === null || parsed.unit === null) {
-        const keyName = normalizeNameForKey(parsed.displayName);
-        const key = `${keyName}|none`;
         if (!aggregated.has(key)) {
           aggregated.set(key, {
             displayName: parsed.displayName,
             quantity: null,
             unit: null,
+            countUnit: null,
             label: labelForIngredient(parsed.displayName),
             sources: new Set([recipe.title])
           });
@@ -523,8 +682,6 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
         continue;
       }
 
-      const keyName = normalizeNameForKey(parsed.displayName);
-      const key = `${keyName}|${parsed.unit}`;
       const existing = aggregated.get(key);
       if (existing) {
         existing.quantity = (existing.quantity ?? 0) + parsed.quantity;
@@ -534,6 +691,7 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
           displayName: parsed.displayName,
           quantity: parsed.quantity,
           unit: parsed.unit,
+          countUnit: parsed.countUnit,
           label: labelForIngredient(parsed.displayName),
           sources: new Set([recipe.title])
         });
@@ -544,12 +702,10 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
   const items: ShoppingItem[] = [];
   for (const entry of aggregated.values()) {
     const recipeList = Array.from(entry.sources);
-    const recipeLabel = recipeList.map((recipe) => recipe.toLowerCase()).join(", ");
+    const recipeLabel = createRecipeLabel(recipeList);
 
     if (entry.quantity === null || entry.unit === null) {
-      const content = recipeLabel
-        ? `${entry.displayName} - ${recipeLabel}`
-        : entry.displayName;
+      const content = recipeLabel ? `${entry.displayName} - ${recipeLabel}` : entry.displayName;
       items.push({
         content,
         labels: [entry.label],
@@ -558,13 +714,18 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
       continue;
     }
 
-    const formattedQty = formatMetricQuantity(entry.quantity, entry.unit);
+    const formattedQty =
+      entry.unit === "count"
+        ? formatCountQuantity(entry.quantity, entry.countUnit)
+        : formatMetricQuantity(entry.quantity, entry.unit);
     const name =
       entry.unit === "count"
-        ? pluralize(entry.displayName, entry.quantity)
+        ? entry.countUnit
+          ? entry.displayName
+          : pluralize(entry.displayName, entry.quantity)
         : entry.displayName;
     const baseContent = `${name} - ${formattedQty}`.trim();
-    const content = `${baseContent} - ${recipeLabel}`;
+    const content = recipeLabel ? `${baseContent} - ${recipeLabel}` : baseContent;
     items.push({
       content,
       labels: [entry.label],
@@ -581,7 +742,7 @@ class TodoistConfirmModal extends ModalBase {
   constructor(
     app: App,
     private summary: ConfirmSummary,
-    private onConfirm: (approved: boolean) => void
+    private onConfirm: (action: TodoistAction) => void
   ) {
     super(app);
   }
@@ -603,23 +764,28 @@ class TodoistConfirmModal extends ModalBase {
 
     const actions = contentEl.createEl("div", { cls: "modal-button-container" });
     const cancel = actions.createEl("button", { text: "Cancel" });
+    const preview = actions.createEl("button", { text: "Preview only" });
     const confirm = actions.createEl("button", { text: "Send to Todoist" });
 
     cancel.addEventListener("click", () => {
-      this.resolve(false);
+      this.resolve("cancel");
+      this.close();
+    });
+    preview.addEventListener("click", () => {
+      this.resolve("preview");
       this.close();
     });
     confirm.addEventListener("click", () => {
-      this.resolve(true);
+      this.resolve("send");
       this.close();
     });
   }
 
   onClose() {
-    this.resolve(false);
+    this.resolve("cancel");
   }
 
-  private resolve(value: boolean) {
+  private resolve(value: TodoistAction) {
     if (this.resolved) return;
     this.resolved = true;
     this.onConfirm(value);
@@ -668,13 +834,23 @@ export class TodoistShoppingListService {
       return;
     }
 
-    const approved = await this.confirmSend({
+    const action = await this.confirmSend({
       weekLabel: payload.weekLabel,
       recipeCount: recipes.length,
       itemCount: items.length,
       baselineCount
     });
-    if (!approved) {
+    if (action === "preview") {
+      await this.writePreview(items, payload.weekLabel);
+      this.plugin.recordLedgerEntry(
+        "skipped",
+        ledgerKey,
+        `todoist: preview saved for ${payload.weekLabel}`
+      );
+      new Notice(`Preview saved to ${PREVIEW_LOG_PATH}`);
+      return;
+    }
+    if (action !== "send") {
       this.plugin.recordLedgerEntry(
         "skipped",
         ledgerKey,
@@ -733,7 +909,7 @@ export class TodoistShoppingListService {
     return recipes;
   }
 
-  private async confirmSend(summary: ConfirmSummary): Promise<boolean> {
+  private async confirmSend(summary: ConfirmSummary): Promise<TodoistAction> {
     return new Promise((resolve) => {
       const modal = new TodoistConfirmModal(this.app, summary, resolve);
       modal.open();
@@ -784,6 +960,19 @@ export class TodoistShoppingListService {
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
+  }
+
+  private async writePreview(items: ShoppingItem[], weekLabel: string) {
+    const lines = [
+      "# todoist preview",
+      "",
+      `week: ${weekLabel}`,
+      `generated: ${new Date().toISOString()}`,
+      "",
+      "## items",
+      ...items.map((item) => `- ${item.content}`)
+    ];
+    await fs.writeFile(PREVIEW_LOG_PATH, lines.join("\n"), "utf8");
   }
 
   private async logSession(payload: {
