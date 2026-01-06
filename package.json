@@ -1,0 +1,35 @@
+{
+  "name": "obsidian-cooking-assistant",
+  "version": "0.0.1",
+  "description": "Unified cooking capture and planning for Obsidian (async inbox + Weekly Organiser).",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run",
+    "test:watch": "vitest watch"
+  },
+  "keywords": [
+    "obsidian",
+    "cooking",
+    "recipes",
+    "kanban"
+  ],
+  "author": "Joe Butler",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "esbuild": "^0.19.12",
+    "obsidian": "^1.5.0",
+    "tslib": "^2.6.2",
+    "typescript": "5.3.3",
+    "vitest": "^1.1.0"
+  }
+}

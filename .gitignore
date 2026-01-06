@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.obsidian/
+.DS_Store
+*.log
+*.lock
+data.json
+package-lock.json
+coverage/
+tmp/

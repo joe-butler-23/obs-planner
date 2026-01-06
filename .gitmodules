@@ -1,0 +1,3 @@
+[submodule "organiser"]
+	path = organiser
+	url = git@github.com:joe-butler-23/obsidian-kanban-organiser.git
