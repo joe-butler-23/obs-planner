@@ -115,6 +115,12 @@ describe("RecipeIndexService", () => {
     const markedOnly = service.getRecipes({ filter: { marked: true } });
     expect(markedOnly).toHaveLength(1);
     expect(markedOnly[0].path).toBe("recipes/alpha.md");
+
+    const addedAfter = service.getRecipes({
+      filter: { addedAfter: Date.parse("2026-01-02T00:00:00Z") }
+    });
+    expect(addedAfter).toHaveLength(1);
+    expect(addedAfter[0].path).toBe("recipes/alpha.md");
   });
 
   it("filters by tag and searches tags", () => {

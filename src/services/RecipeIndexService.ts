@@ -13,6 +13,7 @@ export type RecipeIndexFilter = {
   marked?: boolean;
   scheduled?: boolean;
   tags?: string[];
+  addedAfter?: number;
 };
 
 export type RecipeIndexQuery = {
@@ -153,6 +154,13 @@ export class RecipeIndexService {
     if (query.filter?.scheduled !== undefined) {
       items = items.filter(
         (item) => Boolean(item.scheduled) === query.filter?.scheduled
+      );
+    }
+
+    const addedAfter = query.filter?.addedAfter;
+    if (addedAfter !== undefined) {
+      items = items.filter(
+        (item) => item.addedTimestamp !== null && item.addedTimestamp >= addedAfter
       );
     }
 

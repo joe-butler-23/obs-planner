@@ -8,6 +8,7 @@ const formatDate = (value: string | null) => (value ? value : "");
 
 type MarkedFilter = "all" | "marked" | "unmarked";
 type ScheduledFilter = "all" | "scheduled" | "unscheduled";
+type AddedFilter = "all" | "last-7-days";
 
 export class CookingDatabaseView extends ItemView {
   private readonly plugin: CookingAssistantPlugin;
@@ -22,11 +23,13 @@ export class CookingDatabaseView extends ItemView {
   private tagMenuOpen = false;
   private markedSelect: HTMLSelectElement | null = null;
   private scheduledSelect: HTMLSelectElement | null = null;
+  private addedSelect: HTMLSelectElement | null = null;
   private sortSelect: HTMLSelectElement | null = null;
   private currentSearch = "";
   private currentTags: string[] = [];
   private currentMarkedFilter: MarkedFilter;
   private currentScheduledFilter: ScheduledFilter;
+  private currentAddedFilter: AddedFilter = "all";
   private currentSort: RecipeIndexSort;
 
   constructor(leaf: WorkspaceLeaf, plugin: CookingAssistantPlugin) {
@@ -205,6 +208,18 @@ export class CookingDatabaseView extends ItemView {
       this.scheduleRender();
     });
 
+    this.addedSelect = controls.createEl("select", { cls: "cooking-db__select" });
+    this.addOptions(this.addedSelect, {
+      all: "All added dates",
+      "last-7-days": "Added in last 7 days"
+    });
+    this.addedSelect.value = this.currentAddedFilter;
+    this.addedSelect.addEventListener("change", () => {
+      const value = this.addedSelect?.value as AddedFilter;
+      this.currentAddedFilter = value ?? "all";
+      this.scheduleRender();
+    });
+
     this.gridEl = contentEl.createEl("div", { cls: "cooking-db__grid" });
     this.setTagMenuOpen(false);
   }
@@ -213,6 +228,15 @@ export class CookingDatabaseView extends ItemView {
     if (!this.gridEl || !this.headerCountEl) return;
 
     const settings = this.plugin.settings;
+    const addedAfter =
+      this.currentAddedFilter === "last-7-days"
+        ? (() => {
+            const since = new Date();
+            since.setDate(since.getDate() - 7);
+            since.setHours(0, 0, 0, 0);
+            return since.getTime();
+          })()
+        : undefined;
     const filter = {
       marked:
         this.currentMarkedFilter === "marked"
@@ -226,7 +250,8 @@ export class CookingDatabaseView extends ItemView {
           : this.currentScheduledFilter === "unscheduled"
             ? false
             : undefined,
-      tags: this.currentTags.length > 0 ? this.currentTags : undefined
+      tags: this.currentTags.length > 0 ? this.currentTags : undefined,
+      addedAfter
     };
 
     const { items: recipes, total } = this.index.queryRecipes({

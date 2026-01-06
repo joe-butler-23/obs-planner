@@ -41,7 +41,7 @@ export default class CookingAssistantPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_COOKING_PLANNER,
-      (leaf) => new CookingPlannerView(leaf)
+      (leaf) => new CookingPlannerView(leaf, this)
     );
     this.registerView(
       VIEW_TYPE_COOKING_HEALTH,

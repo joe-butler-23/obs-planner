@@ -1,11 +1,22 @@
 import { WorkspaceLeaf } from "obsidian";
-import { WeeklyOrganiserView } from "../../organiser/src/view";
+import CookingAssistantPlugin from "../main";
+import { TodoistShoppingListService } from "../services/TodoistShoppingListService";
+import {
+  WeeklyOrganiserShoppingListPayload,
+  WeeklyOrganiserView
+} from "../../organiser/src/view";
 
 export const VIEW_TYPE_COOKING_PLANNER = "cooking-planner-view";
 
 export class CookingPlannerView extends WeeklyOrganiserView {
-  constructor(leaf: WorkspaceLeaf) {
+  private todoistService: TodoistShoppingListService;
+
+  constructor(leaf: WorkspaceLeaf, plugin: CookingAssistantPlugin) {
     super(leaf);
+    this.todoistService = new TodoistShoppingListService(this.app, plugin);
+    this.setOnSendShoppingList((payload) => {
+      void this.handleSendShoppingList(payload);
+    });
   }
 
   getViewType() {
@@ -28,5 +39,12 @@ export class CookingPlannerView extends WeeklyOrganiserView {
   async onClose() {
     this.contentEl.removeClass("cooking-planner-view");
     await super.onClose();
+  }
+
+  private async handleSendShoppingList(payload: WeeklyOrganiserShoppingListPayload) {
+    await this.todoistService.sendShoppingList({
+      recipePaths: payload.recipePaths,
+      weekLabel: payload.weekLabel
+    });
   }
 }
