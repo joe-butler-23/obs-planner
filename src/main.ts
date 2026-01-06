@@ -5,6 +5,7 @@ import { GeminiService } from "./services/GeminiService";
 import { InboxWatcher } from "./services/InboxWatcher";
 import { LedgerEntry, LedgerStore } from "./services/LedgerStore";
 import { RecipeWriter } from "./services/RecipeWriter";
+import { CookingDatabaseView, VIEW_TYPE_RECIPE_DATABASE } from "./views/CookingDatabaseView";
 import { CookingHealthView, VIEW_TYPE_COOKING_HEALTH } from "./views/CookingHealthView";
 import { CookingPlannerView, VIEW_TYPE_COOKING_PLANNER } from "./views/CookingPlannerView";
 
@@ -46,6 +47,10 @@ export default class CookingAssistantPlugin extends Plugin {
       VIEW_TYPE_COOKING_HEALTH,
       (leaf) => new CookingHealthView(leaf, this)
     );
+    this.registerView(
+      VIEW_TYPE_RECIPE_DATABASE,
+      (leaf) => new CookingDatabaseView(leaf, this)
+    );
 
     this.addRibbonIcon("calendar-days", "Cooking Planner", () => {
       this.activateCookingPlannerView();
@@ -71,6 +76,18 @@ export default class CookingAssistantPlugin extends Plugin {
       }
     });
 
+    this.addRibbonIcon("layout-grid", "Recipe Database", () => {
+      this.activateRecipeDatabaseView();
+    });
+
+    this.addCommand({
+      id: "open-recipe-database",
+      name: "Open Recipe Database",
+      callback: () => {
+        this.activateRecipeDatabaseView();
+      }
+    });
+
     // Event-driven inbox watcher (create/modify in inbox folder)
     this.registerEvent(this.app.vault.on("create", async (file) => this.handleFileEvent(file)));
     this.registerEvent(this.app.vault.on("modify", async (file) => this.handleFileEvent(file)));
@@ -90,6 +107,7 @@ export default class CookingAssistantPlugin extends Plugin {
   async onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_COOKING_PLANNER);
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_COOKING_HEALTH);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_RECIPE_DATABASE);
   }
 
   private async handleFileEvent(file: TAbstractFile) {
@@ -159,6 +177,24 @@ export default class CookingAssistantPlugin extends Plugin {
       leaf = workspace.getLeaf(true);
       await leaf.setViewState({
         type: VIEW_TYPE_COOKING_HEALTH,
+        active: true
+      });
+    }
+
+    workspace.revealLeaf(leaf);
+  }
+
+  private async activateRecipeDatabaseView() {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | null = null;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_RECIPE_DATABASE);
+
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      leaf = workspace.getLeaf(true);
+      await leaf.setViewState({
+        type: VIEW_TYPE_RECIPE_DATABASE,
         active: true
       });
     }

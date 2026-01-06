@@ -103,3 +103,108 @@
   color: var(--text-muted);
   padding: 8px 0;
 }
+
+.cooking-db {
+  padding: 16px;
+}
+
+.cooking-db__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cooking-db__count {
+  color: var(--text-muted);
+}
+
+.cooking-db__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.cooking-db__card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary-alt);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  content-visibility: auto;
+  contain: layout style paint;
+}
+
+.cooking-db__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.cooking-db__cover {
+  aspect-ratio: 4 / 3;
+  background: var(--background-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cooking-db__cover--empty::after {
+  content: "No image";
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.cooking-db__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cooking-db__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.cooking-db__title {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cooking-db__meta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  min-height: 1.1rem;
+}
+
+.cooking-db__actions {
+  margin-top: 4px;
+}
+
+.cooking-db__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.cooking-db__toggle input {
+  margin: 0;
+}
+
+.cooking-db__empty {
+  color: var(--text-muted);
+  padding: 12px 0;
+}
