@@ -4,6 +4,7 @@ Unified Obsidian-first workflow for the cooking project:
 - Async inbox capture for URL, text, and image jobs (Syncthing/Git as transport)
 - Deterministic-first extraction with Gemini fallback into standardized recipe files
 - Weekly Organiser preserved as a submodule for meal-planning UI (`scheduled`/`marked` semantics intact)
+- Health view for inbox + ledger status
 - Guaranteed `.webp` cover images and existing frontmatter schema (`title`, `type: recipe`, `source`, `added`, `cover`, `cooked`, `marked`, `scheduled`, `tags`)
 
 ## Workflow (flowchart)
@@ -61,5 +62,5 @@ flowchart TD
 ```bash
 VAULT_PATH=/path/to/your/vault ./scripts/obsidian-dev.sh
 ```
-2) In Obsidian, enable **Cooking Assistant** and run `Open Cooking Planner` once.
+2) In Obsidian, enable **Cooking Assistant** and run `Open Cooking Planner` or `Open Cooking Health` once.
 3) When code changes land, use Obsidian's `Reload app without saving` command (or the Hot Reload community plugin) to refresh the plugin.

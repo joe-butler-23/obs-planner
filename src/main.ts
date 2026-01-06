@@ -5,6 +5,7 @@ import { GeminiService } from "./services/GeminiService";
 import { InboxWatcher } from "./services/InboxWatcher";
 import { LedgerEntry, LedgerStore } from "./services/LedgerStore";
 import { RecipeWriter } from "./services/RecipeWriter";
+import { CookingHealthView, VIEW_TYPE_COOKING_HEALTH } from "./views/CookingHealthView";
 import { CookingPlannerView, VIEW_TYPE_COOKING_PLANNER } from "./views/CookingPlannerView";
 
 interface CookingAssistantData {
@@ -41,6 +42,10 @@ export default class CookingAssistantPlugin extends Plugin {
       VIEW_TYPE_COOKING_PLANNER,
       (leaf) => new CookingPlannerView(leaf)
     );
+    this.registerView(
+      VIEW_TYPE_COOKING_HEALTH,
+      (leaf) => new CookingHealthView(leaf, this)
+    );
 
     this.addRibbonIcon("calendar-days", "Cooking Planner", () => {
       this.activateCookingPlannerView();
@@ -51,6 +56,18 @@ export default class CookingAssistantPlugin extends Plugin {
       name: "Open Cooking Planner",
       callback: () => {
         this.activateCookingPlannerView();
+      }
+    });
+
+    this.addRibbonIcon("activity", "Cooking Health", () => {
+      this.activateCookingHealthView();
+    });
+
+    this.addCommand({
+      id: "open-cooking-health",
+      name: "Open Cooking Health",
+      callback: () => {
+        this.activateCookingHealthView();
       }
     });
 
@@ -72,6 +89,7 @@ export default class CookingAssistantPlugin extends Plugin {
 
   async onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_COOKING_PLANNER);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_COOKING_HEALTH);
   }
 
   private async handleFileEvent(file: TAbstractFile) {
@@ -108,6 +126,10 @@ export default class CookingAssistantPlugin extends Plugin {
     await this.savePluginData();
   }
 
+  getLedgerEntries() {
+    return this.ledger?.serialize() ?? [];
+  }
+
   private async activateCookingPlannerView() {
     const { workspace } = this.app;
     let leaf: WorkspaceLeaf | null = null;
@@ -119,6 +141,24 @@ export default class CookingAssistantPlugin extends Plugin {
       leaf = workspace.getLeaf(true);
       await leaf.setViewState({
         type: VIEW_TYPE_COOKING_PLANNER,
+        active: true
+      });
+    }
+
+    workspace.revealLeaf(leaf);
+  }
+
+  private async activateCookingHealthView() {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | null = null;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_COOKING_HEALTH);
+
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      leaf = workspace.getLeaf(true);
+      await leaf.setViewState({
+        type: VIEW_TYPE_COOKING_HEALTH,
         active: true
       });
     }

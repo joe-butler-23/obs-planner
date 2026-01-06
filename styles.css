@@ -1,1 +1,105 @@
 @import "./organiser/styles.css";
+
+.cooking-health {
+  padding: 16px;
+}
+
+.cooking-health__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cooking-health__controls {
+  display: flex;
+  gap: 8px;
+}
+
+.cooking-health__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cooking-health__metric {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.cooking-health__metric-label {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.cooking-health__metric-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.cooking-health__ledger-summary {
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.cooking-health__ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cooking-health__ledger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cooking-health__ledger-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 160px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary-alt);
+}
+
+.cooking-health__ledger-status {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.cooking-health__ledger-row--success .cooking-health__ledger-status {
+  color: var(--text-success);
+}
+
+.cooking-health__ledger-row--error .cooking-health__ledger-status {
+  color: var(--text-error);
+}
+
+.cooking-health__ledger-row--skipped .cooking-health__ledger-status {
+  color: var(--text-muted);
+}
+
+.cooking-health__ledger-detail {
+  word-break: break-word;
+}
+
+.cooking-health__ledger-time {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.cooking-health__empty {
+  color: var(--text-muted);
+  padding: 8px 0;
+}

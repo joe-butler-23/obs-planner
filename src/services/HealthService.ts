@@ -19,6 +19,7 @@ const isErrorLogFile = (file: TFile) => file.name.toLowerCase().endsWith(ERROR_L
 
 const isErrorJobFile = (file: TFile) => {
   const name = file.name.toLowerCase();
+  if (name.endsWith(ERROR_LOG_SUFFIX)) return false;
   return name.endsWith(".error") || name.includes(".error.");
 };
 
