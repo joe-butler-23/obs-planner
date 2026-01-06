@@ -2,15 +2,34 @@
 
 Unified Obsidian-first workflow for the cooking project:
 - Async inbox capture for URL, text, and image jobs (Syncthing/Git as transport)
-- Gemini-powered extraction into standardized recipe files
+- Deterministic-first extraction with Gemini fallback into standardized recipe files
 - Weekly Organiser preserved as a submodule for meal-planning UI (`scheduled`/`marked` semantics intact)
 - Guaranteed `.webp` cover images and existing frontmatter schema (`title`, `type: recipe`, `source`, `added`, `cover`, `cooked`, `marked`, `scheduled`, `tags`)
+
+## Workflow (flowchart)
+```mermaid
+flowchart TD
+  A[Capture: URL / Text / Image] --> B[Inbox folder]
+  B -->|vault create/modify| C[InboxWatcher]
+  C --> D{Job type}
+  D -->|URL| E[Fetch HTML + JSON-LD/WPRM]
+  E --> F{Structured recipe?}
+  F -->|Yes| G[Recipe object]
+  F -->|No| H[Gemini 3 Flash (strict JSON)]
+  D -->|Text| H
+  D -->|Image| H
+  H --> I[Filter against source text]
+  G --> J[RecipeWriter]
+  I --> J
+  J --> K[Recipe .md + .webp cover]
+  J --> L[Archive + ledger]
+```
 
 ## Architecture (high level)
 ```
 [Mobile / Laptop] -> write job to cooking/inbox -> sync -> Obsidian vault
     ↓                                           (vault file events)
-[InboxWatcher] -> Gemini -> RecipeWriter (.webp) -> recipes/
+[InboxWatcher] -> HTML/JSON-LD/WPRM -> Gemini (fallback) -> RecipeWriter (.webp) -> recipes/
                                ↳ dedupe + archive/error quarantine
 ```
 
@@ -28,16 +47,14 @@ Unified Obsidian-first workflow for the cooking project:
 ## Guarantees and invariants
 - Event-driven processing on vault `create/modify` in `cooking/inbox/` (periodic scan as fallback)
 - Deterministic recipe slugs; duplicates skipped/archived with ledger
-- `.webp` covers only (non-webp inputs are quarantined until converted)
+- `.webp` covers only (non-webp inputs are converted on write)
+- URL extraction prefers JSON-LD/WPRM; Gemini is a strict fallback
 - No servers; plugin runs when Obsidian is open
 
-## Current status
-- Repository scaffold in progress. Next steps: wire organiser submodule, implement inbox watcher + recipe writer, add schema/de-dupe tests.
-
 ## Testing / validation plan
-- **Unit (Vitest):** inbox schema parsing (zod), dedupe ledger behavior, slug collision handling, frontmatter generation invariants (.webp cover enforcement).
-- **Integration (vault sim):** stub vault API to confirm inbox event handling routes jobs to writer, archive/quarantine paths are created, and duplicate slugs are rejected.
-- **Manual smoke:** drop URL/text/image jobs into `inbox/` in a throwaway vault, verify notices, archive/error files, and recipe frontmatter fields. Ensure Weekly Organiser board still reads `scheduled/marked` once wired.
+- **Unit (Vitest):** inbox schema parsing, ledger pruning/dedupe, recipe frontmatter invariants, archive folder creation, duplicate slug handling.
+- **Integration (vault sim):** inbox event handling routes jobs to writer, archive/quarantine paths created, `.webp` covers written.
+- **Manual smoke:** drop URL/text/image jobs into `inbox/`, verify notices, archive/error files, recipe content, and Weekly Organiser behavior.
 
 ## Dev workflow (Obsidian hot-reload loop)
 1) Build/watch the plugin and symlink into your vault:
