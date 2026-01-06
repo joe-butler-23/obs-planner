@@ -5,6 +5,7 @@ Unified Obsidian-first workflow for the cooking project:
 - Deterministic-first extraction with Gemini fallback into standardized recipe files
 - Weekly Organiser preserved as a submodule for meal-planning UI (`scheduled`/`marked` semantics intact)
 - Health view for inbox + ledger status
+- Recipe Database view for fast card-based browsing and marking
 - Guaranteed `.webp` cover images and existing frontmatter schema (`title`, `type: recipe`, `source`, `added`, `cover`, `cooked`, `marked`, `scheduled`, `tags`)
 
 ## Workflow (flowchart)
@@ -57,27 +58,22 @@ flowchart TD
 - **Integration (vault sim):** inbox event handling routes jobs to writer, archive/quarantine paths created, `.webp` covers written.
 - **Manual smoke:** drop URL/text/image jobs into `inbox/`, verify notices, archive/error files, recipe content, and Weekly Organiser behavior.
 
-## Planned: Recipe Database view (performance-first)
-1) Fast index service + tests
-   - Cached index keyed by file path, derived from metadataCache + minimal file stats.
-   - Filter strictly by configurable recipes folder.
-   - Precompute fields (title, cover path, marked, added, scheduled) once per file.
-   - Unit tests for filtering, sorting, marked toggle, and cover resolution.
-2) View UI (fast render path)
-   - Responsive card grid with minimal DOM per card.
-   - Lazy image loading and CSS contain/size to avoid layout thrash.
-   - Ctrl/Cmd click opens in a new pane; normal click in current pane.
-   - Marked checkbox updates frontmatter via processFrontMatter.
-   - Debounced refresh on vault/metadata changes (avoid full re-render).
-3) Config + docs + performance toggles
-   - Settings: recipes folder, sort order, filters (marked/scheduled), card density/columns.
-   - Performance toggles: max cards rendered, optional virtualized list if large vault.
-   - README update, npm test, npm run build, commit in small increments.
+## Recipe Database view
+- Command palette: `Open Recipe Database` (or use the grid ribbon icon).
+- Ctrl/Cmd click opens a recipe in a new split; normal click opens in the current pane.
+- Marked checkbox updates recipe frontmatter (`marked: true/false`).
+- Settings: sort order, marked/scheduled filters, card minimum width, max cards.
+
+## Performance notes
+- Cached recipe index keyed by file fingerprint (mtime + size).
+- Debounced refresh on vault/metadata changes to avoid re-render storms.
+- Lazy-loaded images and minimal DOM per card.
+- Max cards limit configurable for large vaults.
 
 ## Dev workflow (Obsidian hot-reload loop)
 1) Build/watch the plugin and symlink into your vault:
 ```bash
 VAULT_PATH=/path/to/your/vault ./scripts/obsidian-dev.sh
 ```
-2) In Obsidian, enable **Cooking Assistant** and run `Open Cooking Planner` or `Open Cooking Health` once.
+2) In Obsidian, enable **Cooking Assistant** and run `Open Cooking Planner`, `Open Cooking Health`, or `Open Recipe Database` once.
 3) When code changes land, use Obsidian's `Reload app without saving` command (or the Hot Reload community plugin) to refresh the plugin.
