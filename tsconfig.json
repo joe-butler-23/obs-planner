@@ -14,7 +14,7 @@
     "noImplicitAny": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": ["obsidian"]
+    "types": ["obsidian", "node"]
   },
   "include": ["src/**/*"]
 }

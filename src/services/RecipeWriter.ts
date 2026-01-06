@@ -1,6 +1,6 @@
 import { App, normalizePath } from "obsidian";
 import { CookingAssistantSettings } from "../settings";
-import { GeminiResult } from "./GeminiService";
+import { ProcessedRecipe } from "../types";
 import { InboxJob } from "./InboxWatcher";
 
 export class RecipeWriter {
@@ -9,11 +9,13 @@ export class RecipeWriter {
     private readonly getSettings: () => CookingAssistantSettings
   ) {}
 
-  async create(result: GeminiResult, job: InboxJob): Promise<string> {
+  async create(result: ProcessedRecipe, job: InboxJob): Promise<string> {
     const settings = this.getSettings();
-    const slug = this.slugify(result.title);
-    const recipeFolder = normalizePath(settings.recipesFolder);
+    const recipe = result.recipe;
+    const title = recipe.title?.trim() || "Captured Recipe";
+    const slug = this.slugify(title);
 
+    const recipeFolder = normalizePath(settings.recipesFolder);
     await this.ensureFolder(recipeFolder);
 
     const targetPath = normalizePath(`${recipeFolder}/${slug}.md`);
@@ -22,29 +24,91 @@ export class RecipeWriter {
       throw new Error(`Duplicate recipe slug: ${slug}`);
     }
 
-    const coverPath = await this.ensureWebpCover(result.coverImagePath, slug);
+    const coverPath = await this.writeCoverImage(result, slug);
+    const added = new Date().toISOString().slice(0, 10);
+    const source = recipe.source || (job.type === "url" ? job.content : "");
+
     const frontmatter = this.buildFrontmatter({
-      title: result.title,
-      source: result.source,
-      added: result.added,
-      cover: coverPath,
-      job
+      title,
+      source,
+      added,
+      cover: coverPath
     });
 
-    const content = [frontmatter, "", result.markdownBody].join("\n");
+    const body = this.buildBody(recipe, coverPath, title);
+    const content = [frontmatter, "", body].join("\n");
+
     await this.app.vault.create(targetPath, content);
     return targetPath;
   }
 
-  private async ensureWebpCover(coverImagePath: string | null | undefined, slug: string) {
-    if (!coverImagePath) return null;
-    if (!coverImagePath.toLowerCase().endsWith(".webp")) {
-      throw new Error("Non-webp cover detected. Add conversion before processing.");
+  private async writeCoverImage(result: ProcessedRecipe, slug: string) {
+    if (!result.imageBytes || !result.imageMimeType) return null;
+
+    const settings = this.getSettings();
+    const imagesFolder = normalizePath(settings.imagesFolder);
+    await this.ensureFolder(imagesFolder);
+
+    const webpBytes = await this.convertToWebp(result.imageBytes, result.imageMimeType);
+    const fileName = `${slug}.webp`;
+    const targetPath = normalizePath(`${imagesFolder}/${fileName}`);
+
+    const existing = this.app.vault.getAbstractFileByPath(targetPath);
+    if (!existing) {
+      await this.app.vault.createBinary(targetPath, webpBytes);
     }
 
-    // For now, assume the provided webp path is already synced into the vault (e.g., via inbox).
-    // TODO: add optional copy/move into imagesFolder once conversion pipeline is wired.
-    return coverImagePath;
+    return this.coverPathForFrontmatter(imagesFolder, settings.recipesFolder, fileName);
+  }
+
+  private async convertToWebp(bytes: ArrayBuffer, mimeType: string): Promise<ArrayBuffer> {
+    if (mimeType === "image/webp") return bytes;
+    if (typeof document === "undefined") {
+      throw new Error("Image conversion requires DOM APIs");
+    }
+
+    const blob = new Blob([bytes], { type: mimeType || "image/png" });
+    const image = await this.blobToImage(blob);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Unable to acquire canvas context for image conversion");
+    }
+    ctx.drawImage(image, 0, 0);
+
+    const webpBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (output) => (output ? resolve(output) : reject(new Error("WebP conversion failed"))),
+        "image/webp",
+        0.9
+      );
+    });
+
+    return await webpBlob.arrayBuffer();
+  }
+
+  private async blobToImage(blob: Blob): Promise<HTMLImageElement> {
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    URL.revokeObjectURL(url);
+    return image;
+  }
+
+  private coverPathForFrontmatter(imagesFolder: string, recipesFolder: string, fileName: string) {
+    const normalizedImages = normalizePath(imagesFolder);
+    const normalizedRecipes = normalizePath(recipesFolder);
+    const imagePath = normalizePath(`${normalizedImages}/${fileName}`);
+
+    if (imagePath.startsWith(`${normalizedRecipes}/`)) {
+      return imagePath.slice(normalizedRecipes.length + 1);
+    }
+
+    return imagePath;
   }
 
   private buildFrontmatter(opts: {
@@ -52,30 +116,59 @@ export class RecipeWriter {
     source?: string | null;
     added: string;
     cover: string | null;
-    job: InboxJob;
   }) {
     const lines = [
       "---",
-      `title: ${opts.title}`,
+      `title: ${this.yamlString(opts.title)}`,
       "type: recipe",
-      `source: ${opts.source ?? ""}`,
+      `source: ${this.yamlString(opts.source ?? "")}`,
       `added: ${opts.added}`,
       `cover: ${opts.cover ?? ""}`,
       "cooked: false",
       "marked: false",
-      "scheduled: null",
-      "tags: []",
+      "scheduled:",
+      "tags:",
       "---"
     ];
     return lines.join("\n");
   }
 
+  private buildBody(recipe: ProcessedRecipe["recipe"], coverPath: string | null, title: string) {
+    const ingredients = recipe.ingredients?.length
+      ? recipe.ingredients.map((ing) => `- ${ing}`).join("\n")
+      : "-";
+    const method = recipe.method?.length
+      ? recipe.method.map((step, index) => `${index + 1}. ${step}`).join("\n")
+      : "1.";
+
+    const sections: Array<string | null> = [
+      `# ${title}`,
+      "",
+      coverPath ? `![Recipe Image](${coverPath})` : null,
+      coverPath ? "" : null,
+      "## Ingredients",
+      ingredients,
+      "",
+      "## Method",
+      method
+    ];
+
+    return sections.filter((section) => section !== null).join("\n");
+  }
+
+  private yamlString(value: string) {
+    if (!value) return "";
+    return JSON.stringify(value);
+  }
+
   private slugify(value: string) {
-    return value
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "captured-recipe";
+    return (
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60) || "captured-recipe"
+    );
   }
 
   private async ensureFolder(path: string) {
