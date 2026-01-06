@@ -62,6 +62,7 @@ flowchart TD
 - Command palette: `Open Recipe Database` (or use the grid ribbon icon).
 - Ctrl/Cmd click opens a recipe in a new split; normal click opens in the current pane.
 - Marked checkbox updates recipe frontmatter (`marked: true/false`).
+- Search bar + tag filter are in the view header.
 - Settings: sort order, marked/scheduled filters, card minimum width, max cards.
 
 ## Performance notes

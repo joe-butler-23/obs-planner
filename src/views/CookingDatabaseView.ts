@@ -1,20 +1,39 @@
 import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
 import CookingAssistantPlugin from "../main";
-import { RecipeIndexService } from "../services/RecipeIndexService";
+import { RecipeIndexService, RecipeIndexSort } from "../services/RecipeIndexService";
 
 export const VIEW_TYPE_RECIPE_DATABASE = "cooking-database-view";
 
 const formatDate = (value: string | null) => (value ? value : "");
 
+type MarkedFilter = "all" | "marked" | "unmarked";
+type ScheduledFilter = "all" | "scheduled" | "unscheduled";
+
 export class CookingDatabaseView extends ItemView {
   private readonly plugin: CookingAssistantPlugin;
   private readonly index: RecipeIndexService;
   private refreshTimer: number | null = null;
+  private suppressRefreshUntil = 0;
+  private headerCountEl: HTMLDivElement | null = null;
+  private gridEl: HTMLDivElement | null = null;
+  private searchInput: HTMLInputElement | null = null;
+  private tagSelect: HTMLSelectElement | null = null;
+  private markedSelect: HTMLSelectElement | null = null;
+  private scheduledSelect: HTMLSelectElement | null = null;
+  private sortSelect: HTMLSelectElement | null = null;
+  private currentSearch = "";
+  private currentTag = "all";
+  private currentMarkedFilter: MarkedFilter;
+  private currentScheduledFilter: ScheduledFilter;
+  private currentSort: RecipeIndexSort;
 
   constructor(leaf: WorkspaceLeaf, plugin: CookingAssistantPlugin) {
     super(leaf);
     this.plugin = plugin;
     this.index = new RecipeIndexService(this.app, () => this.plugin.settings);
+    this.currentMarkedFilter = plugin.settings.databaseMarkedFilter;
+    this.currentScheduledFilter = plugin.settings.databaseScheduledFilter;
+    this.currentSort = plugin.settings.databaseSort;
   }
 
   getViewType() {
@@ -30,7 +49,8 @@ export class CookingDatabaseView extends ItemView {
   }
 
   async onOpen() {
-    this.render();
+    this.buildLayout();
+    this.renderList();
 
     this.registerEvent(this.app.vault.on("create", () => this.scheduleRender()));
     this.registerEvent(this.app.vault.on("modify", () => this.scheduleRender()));
@@ -49,59 +69,150 @@ export class CookingDatabaseView extends ItemView {
     this.scheduleRender();
   }
 
+  applySettings() {
+    const settings = this.plugin.settings;
+    this.currentSort = settings.databaseSort;
+    this.currentMarkedFilter = settings.databaseMarkedFilter;
+    this.currentScheduledFilter = settings.databaseScheduledFilter;
+
+    if (this.sortSelect) this.sortSelect.value = this.currentSort;
+    if (this.markedSelect) this.markedSelect.value = this.currentMarkedFilter;
+    if (this.scheduledSelect) this.scheduledSelect.value = this.currentScheduledFilter;
+
+    this.scheduleRender();
+  }
+
   private scheduleRender() {
+    if (Date.now() < this.suppressRefreshUntil && this.currentMarkedFilter === "all") {
+      return;
+    }
     if (this.refreshTimer !== null) {
       window.clearTimeout(this.refreshTimer);
     }
     this.refreshTimer = window.setTimeout(() => {
       this.refreshTimer = null;
-      this.render();
+      this.renderList();
     }, 200);
   }
 
-  private render() {
-    const settings = this.plugin.settings;
-    const filter = {
-      marked:
-        settings.databaseMarkedFilter === "marked"
-          ? true
-          : settings.databaseMarkedFilter === "unmarked"
-            ? false
-            : undefined,
-      scheduled:
-        settings.databaseScheduledFilter === "scheduled"
-          ? true
-          : settings.databaseScheduledFilter === "unscheduled"
-            ? false
-            : undefined
-    };
-    const allRecipes = this.index.getRecipes({
-      sortBy: settings.databaseSort,
-      filter
-    });
-    const maxCards = settings.databaseMaxCards;
-    const recipes =
-      maxCards && maxCards > 0 ? allRecipes.slice(0, maxCards) : allRecipes;
-    const isTruncated = recipes.length < allRecipes.length;
-
+  private buildLayout() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("cooking-db");
-    const minWidth = Math.max(160, settings.databaseCardMinWidth || 220);
+    const minWidth = Math.max(160, this.plugin.settings.databaseCardMinWidth || 220);
     contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
 
     const header = contentEl.createEl("div", { cls: "cooking-db__header" });
     header.createEl("h2", { text: "Recipe Database" });
-    header.createEl("div", {
+    this.headerCountEl = header.createEl("div", {
       cls: "cooking-db__count",
-      text: isTruncated
-        ? `${recipes.length} of ${allRecipes.length} recipes`
-        : `${allRecipes.length} recipes`
+      text: "0 recipes"
     });
 
-    const grid = contentEl.createEl("div", { cls: "cooking-db__grid" });
+    const controls = contentEl.createEl("div", { cls: "cooking-db__controls" });
+    this.searchInput = controls.createEl("input", {
+      cls: "cooking-db__search",
+      attr: { type: "search", placeholder: "Search recipes..." }
+    });
+    this.searchInput.addEventListener("input", () => {
+      this.currentSearch = this.searchInput?.value.trim() ?? "";
+      this.scheduleRender();
+    });
+
+    this.sortSelect = controls.createEl("select", { cls: "cooking-db__select" });
+    this.addOptions(this.sortSelect, {
+      "added-desc": "Added (newest)",
+      "added-asc": "Added (oldest)",
+      "title-asc": "Title (A-Z)",
+      "title-desc": "Title (Z-A)",
+      "scheduled-desc": "Scheduled (latest)",
+      "scheduled-asc": "Scheduled (oldest)"
+    });
+    this.sortSelect.value = this.currentSort;
+    this.sortSelect.addEventListener("change", () => {
+      this.currentSort =
+        (this.sortSelect?.value as RecipeIndexSort) ?? this.plugin.settings.databaseSort;
+      this.scheduleRender();
+    });
+
+    this.tagSelect = controls.createEl("select", { cls: "cooking-db__select" });
+    this.tagSelect.addEventListener("change", () => {
+      this.currentTag = this.tagSelect?.value ?? "all";
+      this.scheduleRender();
+    });
+
+    this.markedSelect = controls.createEl("select", { cls: "cooking-db__select" });
+    this.addOptions(this.markedSelect, {
+      all: "All marked",
+      marked: "Marked only",
+      unmarked: "Unmarked only"
+    });
+    this.markedSelect.value = this.currentMarkedFilter;
+    this.markedSelect.addEventListener("change", () => {
+      const value = this.markedSelect?.value as MarkedFilter;
+      this.currentMarkedFilter = value ?? "all";
+      this.scheduleRender();
+    });
+
+    this.scheduledSelect = controls.createEl("select", { cls: "cooking-db__select" });
+    this.addOptions(this.scheduledSelect, {
+      all: "All scheduled",
+      scheduled: "Scheduled only",
+      unscheduled: "Unscheduled only"
+    });
+    this.scheduledSelect.value = this.currentScheduledFilter;
+    this.scheduledSelect.addEventListener("change", () => {
+      const value = this.scheduledSelect?.value as ScheduledFilter;
+      this.currentScheduledFilter = value ?? "all";
+      this.scheduleRender();
+    });
+
+    this.gridEl = contentEl.createEl("div", { cls: "cooking-db__grid" });
+  }
+
+  private renderList() {
+    if (!this.gridEl || !this.headerCountEl) return;
+
+    const settings = this.plugin.settings;
+    const filter = {
+      marked:
+        this.currentMarkedFilter === "marked"
+          ? true
+          : this.currentMarkedFilter === "unmarked"
+            ? false
+            : undefined,
+      scheduled:
+        this.currentScheduledFilter === "scheduled"
+          ? true
+          : this.currentScheduledFilter === "unscheduled"
+            ? false
+            : undefined,
+      tag: this.currentTag === "all" ? undefined : this.currentTag
+    };
+
+    const { items: recipes, total } = this.index.queryRecipes({
+      sortBy: this.currentSort,
+      filter,
+      search: this.currentSearch,
+      limit: settings.databaseMaxCards
+    });
+
+    const isTruncated = recipes.length < total;
+    this.headerCountEl.textContent = isTruncated
+      ? `${recipes.length} of ${total} recipes`
+      : `${total} recipes`;
+
+    const tags = this.index.getAvailableTags();
+    this.updateTagOptions(tags);
+
+    const minWidth = Math.max(160, settings.databaseCardMinWidth || 220);
+    this.contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
+
+    const scrollTop = this.contentEl.scrollTop;
+
     if (recipes.length === 0) {
-      grid.createEl("div", { cls: "cooking-db__empty", text: "No recipes found." });
+      this.gridEl.replaceChildren(this.createEmpty("No recipes found."));
+      this.contentEl.scrollTop = scrollTop;
       return;
     }
 
@@ -125,9 +236,10 @@ export class CookingDatabaseView extends ItemView {
 
       const cover = document.createElement("div");
       cover.className = "cooking-db__cover";
-      if (recipe.coverPath) {
+      const resolvedCover = this.resolveImagePath(recipe.coverPath, recipe.path);
+      if (resolvedCover) {
         const img = document.createElement("img");
-        img.src = recipe.coverPath;
+        img.src = resolvedCover;
         img.alt = recipe.title;
         img.loading = "lazy";
         img.decoding = "async";
@@ -164,11 +276,16 @@ export class CookingDatabaseView extends ItemView {
       checkbox.addEventListener("change", async (event) => {
         event.stopPropagation();
         checkbox.disabled = true;
+        if (this.currentMarkedFilter === "all") {
+          this.suppressRefreshUntil = Date.now() + 750;
+        }
         try {
           await this.index.setMarked(recipe.path, checkbox.checked);
         } finally {
           checkbox.disabled = false;
-          this.scheduleRender();
+          if (this.currentMarkedFilter !== "all") {
+            this.scheduleRender();
+          }
         }
       });
       const labelText = document.createElement("span");
@@ -181,7 +298,8 @@ export class CookingDatabaseView extends ItemView {
       fragment.appendChild(card);
     });
 
-    grid.appendChild(fragment);
+    this.gridEl.replaceChildren(fragment);
+    this.contentEl.scrollTop = scrollTop;
   }
 
   private async openRecipe(path: string, forceSplit: boolean) {
@@ -211,5 +329,67 @@ export class CookingDatabaseView extends ItemView {
     }
 
     await leaf.openFile(file, { active: true });
+  }
+
+  private resolveImagePath(coverPath: string | null, sourcePath: string) {
+    if (!coverPath) return null;
+    if (
+      coverPath.startsWith("http://") ||
+      coverPath.startsWith("https://") ||
+      coverPath.startsWith("data:")
+    ) {
+      return coverPath;
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(coverPath);
+    if (file instanceof TFile) {
+      return this.app.vault.getResourcePath(file);
+    }
+
+    const resolved = this.app.metadataCache.getFirstLinkpathDest(coverPath, sourcePath);
+    if (resolved instanceof TFile) {
+      return this.app.vault.getResourcePath(resolved);
+    }
+
+    return null;
+  }
+
+  private addOptions(select: HTMLSelectElement, options: Record<string, string>) {
+    select.replaceChildren();
+    Object.entries(options).forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    });
+  }
+
+  private updateTagOptions(tags: string[]) {
+    if (!this.tagSelect) return;
+    const previous = this.currentTag;
+    this.tagSelect.replaceChildren();
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.textContent = "All tags";
+    this.tagSelect.appendChild(allOption);
+    tags.forEach((tag) => {
+      const option = document.createElement("option");
+      option.value = tag;
+      option.textContent = tag;
+      this.tagSelect?.appendChild(option);
+    });
+    if (tags.includes(previous)) {
+      this.tagSelect.value = previous;
+    } else {
+      this.currentTag = "all";
+      this.tagSelect.value = "all";
+    }
+  }
+
+  private createEmpty(message: string) {
+    const empty = document.createElement("div");
+    empty.className = "cooking-db__empty";
+    empty.textContent = message;
+    return empty;
   }
 }

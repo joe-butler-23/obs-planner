@@ -153,7 +153,7 @@ export default class CookingAssistantPlugin extends Plugin {
     leaves.forEach((leaf) => {
       const view = leaf.view;
       if (view instanceof CookingDatabaseView) {
-        view.refresh();
+        view.applySettings();
       }
     });
   }

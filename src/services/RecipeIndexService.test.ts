@@ -9,11 +9,17 @@ const makeFile = (path: string, mtime = 0, size = 0) => {
   return new TFile(path, name, extension, { mtime, size });
 };
 
-const makeApp = (files: TFile[], frontmatterMap: Map<string, any>) =>
-  ({
+const makeApp = (
+  markdownFiles: TFile[],
+  frontmatterMap: Map<string, any>,
+  extraFiles: TFile[] = []
+) => {
+  const allFiles = [...markdownFiles, ...extraFiles];
+  return {
     vault: {
-      getMarkdownFiles: () => files,
-      getAbstractFileByPath: (path: string) => files.find((file) => file.path === path) ?? null
+      getMarkdownFiles: () => markdownFiles,
+      getAbstractFileByPath: (path: string) =>
+        allFiles.find((file) => file.path === path) ?? null
     },
     metadataCache: {
       getFileCache: (file: TFile) => ({
@@ -27,7 +33,8 @@ const makeApp = (files: TFile[], frontmatterMap: Map<string, any>) =>
         frontmatterMap.set(file.path, frontmatter);
       }
     }
-  }) as unknown as App;
+  } as unknown as App;
+};
 
 describe("RecipeIndexService", () => {
   it("filters to recipes folder and resolves cover paths", () => {
@@ -43,17 +50,19 @@ describe("RecipeIndexService", () => {
           title: "Alpha",
           cover: "images/alpha.webp",
           marked: "true",
-          added: "2026-01-01"
+          added: "2026-01-01",
+          tags: ["soup", "winter"]
         }
       ],
       [
         "cooking/recipes/sub/beta.md",
         {
-          cover: "cooking/recipes/images/beta.webp"
+          cover: "beta.webp",
+          tags: "vegan, quick"
         }
       ]
     ]);
-    const app = makeApp(files, frontmatter);
+    const app = makeApp(files, frontmatter, [makeFile("cooking/recipes/images/beta.webp")]);
     const service = new RecipeIndexService(app, () => ({
       geminiApiKey: "",
       recipesFolder: "cooking/recipes",
@@ -74,6 +83,7 @@ describe("RecipeIndexService", () => {
     expect(recipes[0].coverPath).toBe("cooking/recipes/images/alpha.webp");
     expect(recipes[1].title).toBe("beta");
     expect(recipes[1].coverPath).toBe("cooking/recipes/images/beta.webp");
+    expect(recipes[1].tags).toEqual(["vegan", "quick"]);
   });
 
   it("sorts by added date and filters marked items", () => {
@@ -105,6 +115,38 @@ describe("RecipeIndexService", () => {
     const markedOnly = service.getRecipes({ filter: { marked: true } });
     expect(markedOnly).toHaveLength(1);
     expect(markedOnly[0].path).toBe("recipes/alpha.md");
+  });
+
+  it("filters by tag and searches tags", () => {
+    const files = [
+      makeFile("recipes/alpha.md", 1, 10),
+      makeFile("recipes/beta.md", 2, 20)
+    ];
+    const frontmatter = new Map<string, any>([
+      ["recipes/alpha.md", { tags: ["soup", "winter"] }],
+      ["recipes/beta.md", { tags: "salad" }]
+    ]);
+    const app = makeApp(files, frontmatter);
+    const service = new RecipeIndexService(app, () => ({
+      geminiApiKey: "",
+      recipesFolder: "recipes",
+      inboxFolder: "inbox",
+      archiveFolder: "inbox/archive",
+      imagesFolder: "recipes/images",
+      databaseSort: "added-desc",
+      databaseMarkedFilter: "all",
+      databaseScheduledFilter: "all",
+      databaseCardMinWidth: 220,
+      databaseMaxCards: 500
+    }));
+
+    const filtered = service.getRecipes({ filter: { tag: "soup" } });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].path).toBe("recipes/alpha.md");
+
+    const searched = service.getRecipes({ search: "sal" });
+    expect(searched).toHaveLength(1);
+    expect(searched[0].path).toBe("recipes/beta.md");
   });
 
   it("updates marked frontmatter via setMarked", async () => {

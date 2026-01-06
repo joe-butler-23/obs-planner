@@ -116,6 +116,29 @@
   margin-bottom: 16px;
 }
 
+.cooking-db__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cooking-db__search {
+  flex: 1 1 220px;
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.cooking-db__select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
 .cooking-db__count {
   color: var(--text-muted);
 }

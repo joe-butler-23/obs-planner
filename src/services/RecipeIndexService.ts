@@ -12,6 +12,7 @@ export type RecipeIndexSort =
 export type RecipeIndexFilter = {
   marked?: boolean;
   scheduled?: boolean;
+  tag?: string;
 };
 
 export type RecipeIndexQuery = {
@@ -30,11 +31,13 @@ export type RecipeIndexItem = {
   scheduled: string | null;
   addedTimestamp: number | null;
   scheduledTimestamp: number | null;
+  tags: string[];
 };
 
 type CachedRecipe = RecipeIndexItem & {
   fingerprint: string;
   titleLower: string;
+  tagsLower: string[];
 };
 
 const isTruthyMarked = (value: unknown) =>
@@ -61,6 +64,22 @@ const isRemoteUrl = (value: string) =>
   value.startsWith("https://") ||
   value.startsWith("data:");
 
+const normalizeTags = (tags: string[]) =>
+  Array.from(
+    new Set(
+      tags
+        .map((tag) => tag.replace(/^#/, "").trim())
+        .filter(Boolean)
+        .map((tag) => tag.toLowerCase())
+    )
+  );
+
+const parseTagString = (value: string) =>
+  value
+    .split(/[,;\n]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+
 export class RecipeIndexService {
   private cache = new Map<string, CachedRecipe>();
 
@@ -68,6 +87,15 @@ export class RecipeIndexService {
     private readonly app: App,
     private readonly getSettings: () => CookingAssistantSettings
   ) {}
+
+  getAvailableTags(): string[] {
+    this.refresh();
+    const tags = new Set<string>();
+    for (const item of this.cache.values()) {
+      item.tagsLower.forEach((tag) => tags.add(tag));
+    }
+    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+  }
 
   refresh() {
     const settings = this.getSettings();
@@ -97,14 +125,23 @@ export class RecipeIndexService {
   }
 
   getRecipes(query: RecipeIndexQuery = {}): RecipeIndexItem[] {
+    return this.queryRecipes(query).items;
+  }
+
+  queryRecipes(query: RecipeIndexQuery = {}): { items: RecipeIndexItem[]; total: number } {
     this.refresh();
     const sortBy = query.sortBy ?? "added-desc";
     const needle = query.search?.trim().toLowerCase();
+    const tagNeedle = query.filter?.tag?.trim().toLowerCase();
 
     let items = Array.from(this.cache.values());
 
     if (needle) {
-      items = items.filter((item) => item.titleLower.includes(needle));
+      items = items.filter(
+        (item) =>
+          item.titleLower.includes(needle) ||
+          item.tagsLower.some((tag) => tag.includes(needle))
+      );
     }
 
     if (query.filter?.marked !== undefined) {
@@ -117,13 +154,21 @@ export class RecipeIndexService {
       );
     }
 
+    if (tagNeedle) {
+      items = items.filter((item) => item.tagsLower.includes(tagNeedle));
+    }
+
     items.sort((a, b) => this.compareItems(a, b, sortBy));
 
+    const total = items.length;
     if (query.limit && query.limit > 0) {
       items = items.slice(0, query.limit);
     }
 
-    return items.map(({ titleLower, fingerprint, ...rest }) => rest);
+    return {
+      items: items.map(({ titleLower, fingerprint, tagsLower, ...rest }) => rest),
+      total
+    };
   }
 
   async setMarked(path: string, value: boolean) {
@@ -157,6 +202,7 @@ export class RecipeIndexService {
     const marked = isTruthyMarked(frontmatter.marked);
     const added = parseDateString(frontmatter.added);
     const scheduled = parseDateString(frontmatter.scheduled);
+    const tags = this.extractTags(frontmatter, cache?.tags);
 
     return {
       path: file.path,
@@ -167,8 +213,10 @@ export class RecipeIndexService {
       scheduled,
       addedTimestamp: parseDateTimestamp(added),
       scheduledTimestamp: parseDateTimestamp(scheduled),
+      tags,
       fingerprint,
-      titleLower: title.toLowerCase()
+      titleLower: title.toLowerCase(),
+      tagsLower: normalizeTags(tags)
     };
   }
 
@@ -189,8 +237,22 @@ export class RecipeIndexService {
     if (normalized.startsWith(`${recipesFolder}/`)) return normalized;
     if (normalized.startsWith(`${imagesFolder}/`)) return normalized;
 
-    if (normalized.startsWith("images/") && imagesFolder.startsWith(`${recipesFolder}/`)) {
-      return normalizePath(`${recipesFolder}/${normalized}`);
+    if (normalized.startsWith("images/") && imagesFolder) {
+      const relative = normalized.slice("images/".length);
+      const candidate = normalizePath(`${imagesFolder}/${relative}`);
+      if (this.app.vault.getAbstractFileByPath(candidate)) {
+        return candidate;
+      }
+      if (imagesFolder.startsWith(`${recipesFolder}/`)) {
+        return normalizePath(`${recipesFolder}/${normalized}`);
+      }
+    }
+
+    if (!normalized.includes("/") && imagesFolder) {
+      const candidate = normalizePath(`${imagesFolder}/${normalized}`);
+      if (this.app.vault.getAbstractFileByPath(candidate)) {
+        return candidate;
+      }
     }
 
     const parent = filePath.split("/").slice(0, -1).join("/");
@@ -226,5 +288,21 @@ export class RecipeIndexService {
     const bValue =
       b ?? (direction === "asc" ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY);
     return direction === "asc" ? aValue - bValue : bValue - aValue;
+  }
+
+  private extractTags(frontmatter: Record<string, unknown>, cacheTags?: Array<{ tag: string }>) {
+    const tags: string[] = [];
+    const frontmatterTags = frontmatter.tags;
+    if (Array.isArray(frontmatterTags)) {
+      tags.push(...frontmatterTags.map((tag) => String(tag)));
+    } else if (typeof frontmatterTags === "string") {
+      tags.push(...parseTagString(frontmatterTags));
+    }
+
+    if (cacheTags?.length) {
+      tags.push(...cacheTags.map((entry) => entry.tag));
+    }
+
+    return Array.from(new Set(tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean)));
   }
 }
