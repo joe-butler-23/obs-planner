@@ -38,3 +38,11 @@ Unified Obsidian-first workflow for the cooking project:
 - **Unit (Vitest):** inbox schema parsing (zod), dedupe ledger behavior, slug collision handling, frontmatter generation invariants (.webp cover enforcement).
 - **Integration (vault sim):** stub vault API to confirm inbox event handling routes jobs to writer, archive/quarantine paths are created, and duplicate slugs are rejected.
 - **Manual smoke:** drop URL/text/image jobs into `inbox/` in a throwaway vault, verify notices, archive/error files, and recipe frontmatter fields. Ensure Weekly Organiser board still reads `scheduled/marked` once wired.
+
+## Dev workflow (Obsidian hot-reload loop)
+1) Build/watch the plugin and symlink into your vault:
+```bash
+VAULT_PATH=/path/to/your/vault ./scripts/obsidian-dev.sh
+```
+2) In Obsidian, enable **Cooking Assistant** and run `Open Weekly Organiser` once.
+3) When code changes land, use Obsidian's `Reload app without saving` command (or the Hot Reload community plugin) to refresh the plugin.

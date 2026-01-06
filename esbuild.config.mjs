@@ -18,7 +18,7 @@ const ctx = await esbuild.context({
     "@codemirror/view",
     "@lezer/common"
   ],
-  outfile: "dist/main.js",
+  outfile: "main.js",
   sourcemap: isProd ? false : "inline",
   banner,
   loader: {

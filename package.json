@@ -2,7 +2,7 @@
   "name": "obsidian-cooking-assistant",
   "version": "0.0.1",
   "description": "Unified cooking capture and planning for Obsidian (async inbox + Weekly Organiser).",
-  "main": "dist/main.js",
+  "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
