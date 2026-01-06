@@ -13,7 +13,7 @@ interface CookingAssistantData {
 }
 
 export default class CookingAssistantPlugin extends Plugin {
-  settings: CookingAssistantSettings;
+  settings: CookingAssistantSettings = DEFAULT_SETTINGS;
   private ledger: LedgerStore | null = null;
   inboxWatcher: InboxWatcher | null = null;
 
