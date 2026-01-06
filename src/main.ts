@@ -5,7 +5,7 @@ import { GeminiService } from "./services/GeminiService";
 import { InboxWatcher } from "./services/InboxWatcher";
 import { LedgerEntry, LedgerStore } from "./services/LedgerStore";
 import { RecipeWriter } from "./services/RecipeWriter";
-import { VIEW_TYPE_WEEKLY_ORGANISER, WeeklyOrganiserView } from "../organiser/src/view";
+import { CookingPlannerView, VIEW_TYPE_COOKING_PLANNER } from "./views/CookingPlannerView";
 
 interface CookingAssistantData {
   settings: CookingAssistantSettings;
@@ -38,19 +38,19 @@ export default class CookingAssistantPlugin extends Plugin {
     );
 
     this.registerView(
-      VIEW_TYPE_WEEKLY_ORGANISER,
-      (leaf) => new WeeklyOrganiserView(leaf)
+      VIEW_TYPE_COOKING_PLANNER,
+      (leaf) => new CookingPlannerView(leaf)
     );
 
-    this.addRibbonIcon("calendar-days", "Weekly Organiser", () => {
-      this.activateWeeklyOrganiserView();
+    this.addRibbonIcon("calendar-days", "Cooking Planner", () => {
+      this.activateCookingPlannerView();
     });
 
     this.addCommand({
-      id: "open-weekly-organiser",
-      name: "Open Weekly Organiser",
+      id: "open-cooking-planner",
+      name: "Open Cooking Planner",
       callback: () => {
-        this.activateWeeklyOrganiserView();
+        this.activateCookingPlannerView();
       }
     });
 
@@ -71,7 +71,7 @@ export default class CookingAssistantPlugin extends Plugin {
   }
 
   async onunload() {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_WEEKLY_ORGANISER);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_COOKING_PLANNER);
   }
 
   private async handleFileEvent(file: TAbstractFile) {
@@ -108,17 +108,17 @@ export default class CookingAssistantPlugin extends Plugin {
     await this.savePluginData();
   }
 
-  private async activateWeeklyOrganiserView() {
+  private async activateCookingPlannerView() {
     const { workspace } = this.app;
     let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_WEEKLY_ORGANISER);
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_COOKING_PLANNER);
 
     if (leaves.length > 0) {
       leaf = leaves[0];
     } else {
       leaf = workspace.getLeaf(true);
       await leaf.setViewState({
-        type: VIEW_TYPE_WEEKLY_ORGANISER,
+        type: VIEW_TYPE_COOKING_PLANNER,
         active: true
       });
     }
