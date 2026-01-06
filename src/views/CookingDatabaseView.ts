@@ -102,8 +102,9 @@ export class CookingDatabaseView extends ItemView {
     contentEl.empty();
     contentEl.addClass("cooking-db");
     const baseWidth = Math.max(160, this.plugin.settings.databaseCardMinWidth || 220);
-    const minWidth = Math.max(160, baseWidth - 20);
-    const maxWidth = Math.max(minWidth, baseWidth + 40);
+    const scaledBase = Math.max(140, Math.round(baseWidth * 0.8));
+    const minWidth = Math.max(140, scaledBase - 12);
+    const maxWidth = Math.max(minWidth, scaledBase + 28);
     contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
     contentEl.style.setProperty("--cooking-db-card-max", `${maxWidth}px`);
 
@@ -241,8 +242,9 @@ export class CookingDatabaseView extends ItemView {
     this.updateTagOptions(tags);
 
     const baseWidth = Math.max(160, settings.databaseCardMinWidth || 220);
-    const minWidth = Math.max(160, baseWidth - 20);
-    const maxWidth = Math.max(minWidth, baseWidth + 40);
+    const scaledBase = Math.max(140, Math.round(baseWidth * 0.8));
+    const minWidth = Math.max(140, scaledBase - 12);
+    const maxWidth = Math.max(minWidth, scaledBase + 28);
     this.contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
     this.contentEl.style.setProperty("--cooking-db-card-max", `${maxWidth}px`);
 

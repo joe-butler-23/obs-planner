@@ -220,7 +220,7 @@
     minmax(var(--cooking-db-card-min, 200px), var(--cooking-db-card-max, 260px))
   );
   gap: 12px;
-  justify-content: center;
+  justify-content: start;
 }
 
 .cooking-db__card {
@@ -291,7 +291,7 @@
 }
 
 .cooking-db__actions {
-  margin-top: 4px;
+  margin-top: auto;
 }
 
 .cooking-db__toggle {
