@@ -4,7 +4,7 @@ import { z } from "zod";
 import { CookingAssistantSettings } from "../settings";
 import { GeminiService } from "./GeminiService";
 import { LedgerStore } from "./LedgerStore";
-import { RecipeWriter } from "./RecipeWriter";
+import { DuplicateRecipeError, RecipeWriter } from "./RecipeWriter";
 
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp"]);
 const SUPPORTED_TEXT_EXTENSIONS = new Set(["txt", "md"]);
@@ -108,6 +108,18 @@ export class InboxWatcher {
 
       this.notify(`Imported: ${recipePath}`);
     } catch (error) {
+      if (error instanceof DuplicateRecipeError) {
+        this.ledger.recordSkipped(jobKey, `duplicate recipe slug: ${error.slug}`);
+        await this.archive(file, ".dupe");
+
+        if (secondaryFile && secondaryFile.path !== file.path && this.isInInbox(secondaryFile)) {
+          await this.archive(secondaryFile, ".dupe");
+        }
+
+        this.notify(`Skipped duplicate: ${file.name}`);
+        return;
+      }
+
       console.error(`Failed to process ${file.path}`, error);
       const reason = error instanceof Error ? error.message : "Unknown error";
       this.ledger.recordError(jobKey, reason);
@@ -284,9 +296,13 @@ export class InboxWatcher {
 
   private async ensureFolder(path: string) {
     const normalized = normalizePath(path);
-    const existing = this.app.vault.getAbstractFileByPath(normalized);
-    if (existing) return;
-    await this.app.vault.createFolder(normalized);
+    const parts = normalized.split("/").filter(Boolean);
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      if (this.app.vault.getAbstractFileByPath(current)) continue;
+      await this.app.vault.createFolder(current);
+    }
   }
 
   private hashString(value: string) {

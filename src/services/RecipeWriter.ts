@@ -3,6 +3,13 @@ import { CookingAssistantSettings } from "../settings";
 import { ProcessedRecipe } from "../types";
 import { InboxJob } from "./InboxWatcher";
 
+export class DuplicateRecipeError extends Error {
+  constructor(public readonly slug: string) {
+    super(`Duplicate recipe slug: ${slug}`);
+    this.name = "DuplicateRecipeError";
+  }
+}
+
 export class RecipeWriter {
   constructor(
     private readonly app: App,
@@ -21,7 +28,7 @@ export class RecipeWriter {
     const targetPath = normalizePath(`${recipeFolder}/${slug}.md`);
     const existing = this.app.vault.getAbstractFileByPath(targetPath);
     if (existing) {
-      throw new Error(`Duplicate recipe slug: ${slug}`);
+      throw new DuplicateRecipeError(slug);
     }
 
     const coverPath = await this.writeCoverImage(result, slug);
@@ -173,8 +180,12 @@ export class RecipeWriter {
 
   private async ensureFolder(path: string) {
     const normalized = normalizePath(path);
-    const existing = this.app.vault.getAbstractFileByPath(normalized);
-    if (existing) return;
-    await this.app.vault.createFolder(normalized);
+    const parts = normalized.split("/").filter(Boolean);
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      if (this.app.vault.getAbstractFileByPath(current)) continue;
+      await this.app.vault.createFolder(current);
+    }
   }
 }
