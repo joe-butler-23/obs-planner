@@ -238,6 +238,41 @@ const LABEL_RULES: Array<{ label: string; keywords: string[] }> = [
 
 const normalizeSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
 
+const PREP_PHRASES = [
+  "good-quality",
+  "good quality",
+  "quality",
+  "fresh",
+  "freshly",
+  "finely",
+  "roughly",
+  "thinly",
+  "thickly",
+  "chopped",
+  "minced",
+  "sliced",
+  "diced",
+  "grated",
+  "peeled",
+  "crushed",
+  "ground",
+  "shredded",
+  "julienned",
+  "halved",
+  "quartered",
+  "trimmed",
+  "rinsed",
+  "drained",
+  "optional",
+  "to taste"
+];
+
+const INGREDIENT_ALIASES: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /\bvegetable\s+stock\b/i, replacement: "veg stock" },
+  { pattern: /\bvegetable\s+broth\b/i, replacement: "veg stock" },
+  { pattern: /\bveg(?:etable)?\s+stock\b/i, replacement: "veg stock" }
+];
+
 export const parseIngredientsSection = (markdown: string): string[] => {
   const lines = markdown.split(/\r?\n/);
   const items: string[] = [];
@@ -307,6 +342,30 @@ const normalizeUnitToken = (token: string | undefined): string | null => {
   if (!token) return null;
   const cleaned = token.toLowerCase().replace(/[.,]/g, "");
   return UNIT_ALIASES[cleaned] ?? null;
+};
+
+const sanitizeIngredientName = (value: string): string => {
+  let cleaned = value;
+
+  cleaned = cleaned.replace(/\(.*?\)/g, "");
+  cleaned = cleaned.split(/[,;].*/)[0] ?? cleaned;
+
+  for (const phrase of PREP_PHRASES) {
+    const pattern = new RegExp(`\\b${phrase.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "gi");
+    cleaned = cleaned.replace(pattern, "");
+  }
+
+  cleaned = cleaned.replace(/\b(of|and|with)\b\s*$/i, "");
+  cleaned = normalizeSpaces(cleaned.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, ""));
+
+  for (const alias of INGREDIENT_ALIASES) {
+    if (alias.pattern.test(cleaned)) {
+      cleaned = cleaned.replace(alias.pattern, alias.replacement);
+      break;
+    }
+  }
+
+  return normalizeSpaces(cleaned);
 };
 
 const convertToMetric = (
@@ -424,11 +483,12 @@ export const parseIngredientLine = (line: string): ParsedIngredient | null => {
   }
 
   const name = normalizeSpaces(tokens.slice(nameStart).join(" "));
-  if (!name) return null;
+  const sanitizedName = sanitizeIngredientName(name);
+  if (!sanitizedName) return null;
 
   const metric = convertToMetric(quantity, unitToken);
   return {
-    displayName: name,
+    displayName: sanitizedName,
     quantity: metric.quantity,
     unit: metric.unit
   };
@@ -479,9 +539,15 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
 
   const items: ShoppingItem[] = [];
   for (const entry of aggregated.values()) {
+    const recipeList = Array.from(entry.sources);
+    const recipeLabel = recipeList.join(", ");
+
     if (entry.quantity === null || entry.unit === null) {
+      const content = recipeLabel
+        ? `${entry.displayName} - ${recipeLabel}`
+        : entry.displayName;
       items.push({
-        content: entry.displayName,
+        content,
         labels: [entry.label],
         sources: Array.from(entry.sources)
       });
@@ -493,10 +559,8 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
       entry.unit === "count"
         ? pluralize(entry.displayName, entry.quantity)
         : entry.displayName;
-    const content =
-      entry.unit === "count"
-        ? `${name} ${formattedQty}`.trim()
-        : `${formattedQty} ${name}`.trim();
+    const baseContent = `${name} - ${formattedQty}`.trim();
+    const content = `${baseContent} - ${recipeLabel}`;
     items.push({
       content,
       labels: [entry.label],
@@ -562,8 +626,14 @@ export class TodoistShoppingListService {
   constructor(private app: App, private plugin: CookingAssistantPlugin) {}
 
   async sendShoppingList(payload: { recipePaths: string[]; weekLabel: string }) {
+    const ledgerKey = this.createLedgerKey(payload.weekLabel);
     if (!payload.recipePaths.length) {
       new Notice("No scheduled recipes found for this week.");
+      this.plugin.recordLedgerEntry(
+        "skipped",
+        ledgerKey,
+        `todoist: no scheduled recipes for ${payload.weekLabel}`
+      );
       return;
     }
 
@@ -571,6 +641,11 @@ export class TodoistShoppingListService {
     const items = buildShoppingItems(recipes);
     if (items.length === 0) {
       new Notice("No ingredients found in scheduled recipes.");
+      this.plugin.recordLedgerEntry(
+        "skipped",
+        ledgerKey,
+        `todoist: no ingredients found for ${payload.weekLabel}`
+      );
       return;
     }
 
@@ -580,6 +655,11 @@ export class TodoistShoppingListService {
       baselineCount = current.length;
     } catch (error) {
       new Notice("Todoist list failed. Check TODOIST_TOKEN.");
+      this.plugin.recordLedgerEntry(
+        "error",
+        ledgerKey,
+        `todoist: list failed (${this.formatError(error)})`
+      );
       console.error("Todoist list failed", error);
       return;
     }
@@ -590,13 +670,25 @@ export class TodoistShoppingListService {
       itemCount: items.length,
       baselineCount
     });
-    if (!approved) return;
+    if (!approved) {
+      this.plugin.recordLedgerEntry(
+        "skipped",
+        ledgerKey,
+        `todoist: cancelled for ${payload.weekLabel}`
+      );
+      return;
+    }
 
     let created: Array<{ id: string; content: string; labels: string[] }> = [];
     try {
       created = await this.createTodoistTasks(items);
     } catch (error) {
       new Notice("Todoist create failed. Check token and logs.");
+      this.plugin.recordLedgerEntry(
+        "error",
+        ledgerKey,
+        `todoist: create failed (${this.formatError(error)})`
+      );
       console.error("Todoist create failed", error);
       return;
     }
@@ -612,6 +704,11 @@ export class TodoistShoppingListService {
     }
 
     new Notice(`Sent ${created.length} items to Todoist.`);
+    this.plugin.recordLedgerEntry(
+      "success",
+      ledgerKey,
+      `todoist: sent ${created.length} items for ${payload.weekLabel}`
+    );
   }
 
   private async loadRecipes(paths: string[]): Promise<RecipeSource[]> {
@@ -717,5 +814,16 @@ export class TodoistShoppingListService {
     const entries = Array.isArray(history) ? history : [];
     entries.push(entry);
     await fs.writeFile(SESSION_LOG_PATH, JSON.stringify(entries, null, 2), "utf8");
+  }
+
+  private createLedgerKey(weekLabel: string) {
+    const timestamp = new Date().toISOString();
+    const safeWeek = weekLabel.replace(/\s+/g, "-").toLowerCase();
+    return `todoist:${safeWeek}:${timestamp}`;
+  }
+
+  private formatError(error: unknown) {
+    if (error instanceof Error) return error.message;
+    return String(error);
   }
 }

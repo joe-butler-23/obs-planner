@@ -28,19 +28,38 @@ describe("TodoistShoppingListService helpers", () => {
       { path: "b.md", title: "Recipe B", ingredients: ["2 onions", "salt"] }
     ]);
     const onion = items.find((item) => item.content.includes("onion"));
-    expect(onion?.content).toBe("onions 3");
+    expect(onion?.content).toBe("onions - 3 - Recipe A, Recipe B");
     const salt = items.filter((item) => item.content === "salt");
-    expect(salt).toHaveLength(1);
+    expect(salt).toHaveLength(0);
+    const saltItem = items.find((item) => item.content.startsWith("salt -"));
+    expect(saltItem?.content).toBe("salt - Recipe A, Recipe B");
   });
 
   it("converts imperial units to metric", () => {
     const items = buildShoppingItems([
       { path: "c.md", title: "Recipe C", ingredients: ["1 lb flour"] }
     ]);
-    expect(items[0].content).toBe("454g flour");
+    expect(items[0].content).toBe("flour - 454g - Recipe C");
   });
 
   it("labels common produce", () => {
     expect(labelForIngredient("onion")).toBe("fruit-and-veg");
+  });
+
+  it("strips prep notes and normalizes stock labels", () => {
+    const items = buildShoppingItems([
+      {
+        path: "d.md",
+        title: "Beanotto",
+        ingredients: [
+          "250g carrots, sliced into thin coins on a slight angle (just thinner than a pound coin)",
+          "500ml good-quality vegetable stock"
+        ]
+      }
+    ]);
+    const carrot = items.find((item) => item.content.startsWith("carrots -"));
+    expect(carrot?.content).toBe("carrots - 250g - Beanotto");
+    const stock = items.find((item) => item.content.startsWith("veg stock -"));
+    expect(stock?.content).toBe("veg stock - 500ml - Beanotto");
   });
 });

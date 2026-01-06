@@ -115,12 +115,48 @@ export class CookingHealthView extends ItemView {
         cls: "cooking-health__empty",
         text: "No recent activity."
       });
+    } else {
+      const list = ledgerContainer.createEl("div", { cls: "cooking-health__ledger-list" });
+      snapshot.recentEntries.forEach((entry) => {
+        const row = list.createEl("div", {
+          cls: `cooking-health__ledger-row cooking-health__ledger-row--${entry.status}`
+        });
+        row.createEl("div", { cls: "cooking-health__ledger-status", text: entry.status });
+        row.createEl("div", {
+          cls: "cooking-health__ledger-detail",
+          text: entry.detail ?? entry.key
+        });
+        row.createEl("div", {
+          cls: "cooking-health__ledger-time",
+          text: formatTimestamp(entry.processedAt)
+        });
+      });
+    }
+
+    const todoistEntries = this.plugin
+      .getLedgerEntries()
+      .filter((entry) => entry.key.startsWith("todoist:"))
+      .sort((a, b) => b.processedAt.localeCompare(a.processedAt))
+      .slice(0, 10);
+
+    const todoistContainer = contentEl.createEl("div", {
+      cls: "cooking-health__todoist"
+    });
+    todoistContainer.createEl("h3", { text: "Todoist activity" });
+
+    if (todoistEntries.length === 0) {
+      todoistContainer.createEl("div", {
+        cls: "cooking-health__empty",
+        text: "No Todoist activity yet."
+      });
       return;
     }
 
-    const list = ledgerContainer.createEl("div", { cls: "cooking-health__ledger-list" });
-    snapshot.recentEntries.forEach((entry) => {
-      const row = list.createEl("div", {
+    const todoistList = todoistContainer.createEl("div", {
+      cls: "cooking-health__ledger-list"
+    });
+    todoistEntries.forEach((entry) => {
+      const row = todoistList.createEl("div", {
         cls: `cooking-health__ledger-row cooking-health__ledger-row--${entry.status}`
       });
       row.createEl("div", { cls: "cooking-health__ledger-status", text: entry.status });

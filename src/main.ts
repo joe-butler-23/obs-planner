@@ -3,7 +3,7 @@ import { CaptureModal } from "./components/CaptureModal";
 import { CookingAssistantSettingTab, CookingAssistantSettings, DEFAULT_SETTINGS } from "./settings";
 import { GeminiService } from "./services/GeminiService";
 import { InboxWatcher } from "./services/InboxWatcher";
-import { LedgerEntry, LedgerStore } from "./services/LedgerStore";
+import { LedgerEntry, LedgerStatus, LedgerStore } from "./services/LedgerStore";
 import { RecipeWriter } from "./services/RecipeWriter";
 import { CookingDatabaseView, VIEW_TYPE_RECIPE_DATABASE } from "./views/CookingDatabaseView";
 import { CookingHealthView, VIEW_TYPE_COOKING_HEALTH } from "./views/CookingHealthView";
@@ -146,6 +146,19 @@ export default class CookingAssistantPlugin extends Plugin {
 
   getLedgerEntries() {
     return this.ledger?.serialize() ?? [];
+  }
+
+  recordLedgerEntry(status: LedgerStatus, key: string, detail?: string) {
+    if (!this.ledger) return;
+    if (status === "success") {
+      this.ledger.recordSuccess(key, detail);
+      return;
+    }
+    if (status === "error") {
+      this.ledger.recordError(key, detail);
+      return;
+    }
+    this.ledger.recordSkipped(key, detail);
   }
 
   refreshRecipeDatabaseView() {
