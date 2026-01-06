@@ -1,4 +1,4 @@
-import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import CookingAssistantPlugin from "../main";
 import { RecipeIndexService, RecipeIndexSort } from "../services/RecipeIndexService";
 
@@ -22,7 +22,7 @@ export class CookingDatabaseView extends ItemView {
   private scheduledSelect: HTMLSelectElement | null = null;
   private sortSelect: HTMLSelectElement | null = null;
   private currentSearch = "";
-  private currentTag = "all";
+  private currentTags: string[] = [];
   private currentMarkedFilter: MarkedFilter;
   private currentScheduledFilter: ScheduledFilter;
   private currentSort: RecipeIndexSort;
@@ -110,6 +110,15 @@ export class CookingDatabaseView extends ItemView {
     });
 
     const controls = contentEl.createEl("div", { cls: "cooking-db__controls" });
+    const plannerButton = controls.createEl("button", {
+      cls: "cooking-db__icon-button",
+      attr: { type: "button", "aria-label": "Open Cooking Planner" }
+    });
+    setIcon(plannerButton, "calendar-days");
+    plannerButton.addEventListener("click", () => {
+      void this.plugin.openCookingPlannerView();
+    });
+
     this.searchInput = controls.createEl("input", {
       cls: "cooking-db__search",
       attr: { type: "search", placeholder: "Search recipes..." }
@@ -135,9 +144,29 @@ export class CookingDatabaseView extends ItemView {
       this.scheduleRender();
     });
 
-    this.tagSelect = controls.createEl("select", { cls: "cooking-db__select" });
+    this.tagSelect = controls.createEl("select", {
+      cls: "cooking-db__select cooking-db__select--tags",
+      attr: { multiple: "true" }
+    });
+    this.tagSelect.size = 1;
     this.tagSelect.addEventListener("change", () => {
-      this.currentTag = this.tagSelect?.value ?? "all";
+      if (!this.tagSelect) return;
+      const selected = Array.from(this.tagSelect.selectedOptions).map(
+        (option) => option.value
+      );
+      if (selected.includes("all")) {
+        this.currentTags = [];
+        Array.from(this.tagSelect.options).forEach((option) => {
+          option.selected = option.value === "all";
+        });
+      } else {
+        this.currentTags = selected.filter(Boolean);
+        if (this.currentTags.length === 0) {
+          Array.from(this.tagSelect.options).forEach((option) => {
+            option.selected = option.value === "all";
+          });
+        }
+      }
       this.scheduleRender();
     });
 
@@ -187,7 +216,7 @@ export class CookingDatabaseView extends ItemView {
           : this.currentScheduledFilter === "unscheduled"
             ? false
             : undefined,
-      tag: this.currentTag === "all" ? undefined : this.currentTag
+      tags: this.currentTags.length > 0 ? this.currentTags : undefined
     };
 
     const { items: recipes, total } = this.index.queryRecipes({
@@ -366,7 +395,7 @@ export class CookingDatabaseView extends ItemView {
 
   private updateTagOptions(tags: string[]) {
     if (!this.tagSelect) return;
-    const previous = this.currentTag;
+    const previous = this.currentTags.filter((tag) => tags.includes(tag));
     this.tagSelect.replaceChildren();
     const allOption = document.createElement("option");
     allOption.value = "all";
@@ -376,14 +405,13 @@ export class CookingDatabaseView extends ItemView {
       const option = document.createElement("option");
       option.value = tag;
       option.textContent = tag;
+      option.selected = previous.includes(tag);
       this.tagSelect?.appendChild(option);
     });
-    if (tags.includes(previous)) {
-      this.tagSelect.value = previous;
-    } else {
-      this.currentTag = "all";
-      this.tagSelect.value = "all";
+    if (previous.length === 0) {
+      allOption.selected = true;
     }
+    this.currentTags = previous;
   }
 
   private createEmpty(message: string) {

@@ -140,7 +140,7 @@ describe("RecipeIndexService", () => {
       databaseMaxCards: 500
     }));
 
-    const filtered = service.getRecipes({ filter: { tag: "soup" } });
+    const filtered = service.getRecipes({ filter: { tags: ["soup"] } });
     expect(filtered).toHaveLength(1);
     expect(filtered[0].path).toBe("recipes/alpha.md");
 

@@ -12,7 +12,7 @@ export type RecipeIndexSort =
 export type RecipeIndexFilter = {
   marked?: boolean;
   scheduled?: boolean;
-  tag?: string;
+  tags?: string[];
 };
 
 export type RecipeIndexQuery = {
@@ -132,7 +132,9 @@ export class RecipeIndexService {
     this.refresh();
     const sortBy = query.sortBy ?? "added-desc";
     const needle = query.search?.trim().toLowerCase();
-    const tagNeedle = query.filter?.tag?.trim().toLowerCase();
+    const tagNeedles = query.filter?.tags
+      ?.map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean);
 
     let items = Array.from(this.cache.values());
 
@@ -154,8 +156,10 @@ export class RecipeIndexService {
       );
     }
 
-    if (tagNeedle) {
-      items = items.filter((item) => item.tagsLower.includes(tagNeedle));
+    if (tagNeedles && tagNeedles.length > 0) {
+      items = items.filter((item) =>
+        tagNeedles.every((tag) => item.tagsLower.includes(tag))
+      );
     }
 
     items.sort((a, b) => this.compareItems(a, b, sortBy));

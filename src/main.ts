@@ -53,14 +53,14 @@ export default class CookingAssistantPlugin extends Plugin {
     );
 
     this.addRibbonIcon("calendar-days", "Cooking Planner", () => {
-      this.activateCookingPlannerView();
+      this.openCookingPlannerView();
     });
 
     this.addCommand({
       id: "open-cooking-planner",
       name: "Open Cooking Planner",
       callback: () => {
-        this.activateCookingPlannerView();
+        this.openCookingPlannerView();
       }
     });
 
@@ -158,7 +158,7 @@ export default class CookingAssistantPlugin extends Plugin {
     });
   }
 
-  private async activateCookingPlannerView() {
+  async openCookingPlannerView() {
     const { workspace } = this.app;
     let leaf: WorkspaceLeaf | null = null;
     const leaves = workspace.getLeavesOfType(VIEW_TYPE_COOKING_PLANNER);
