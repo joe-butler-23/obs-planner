@@ -42,7 +42,12 @@ describe("RecipeWriter", () => {
       recipesFolder: "recipes",
       inboxFolder: "inbox",
       archiveFolder: "inbox/archive",
-      imagesFolder: "recipes/images"
+      imagesFolder: "recipes/images",
+      databaseSort: "added-desc",
+      databaseMarkedFilter: "all",
+      databaseScheduledFilter: "all",
+      databaseCardMinWidth: 220,
+      databaseMaxCards: 500
     };
 
     const writer = new RecipeWriter(app, () => settings);

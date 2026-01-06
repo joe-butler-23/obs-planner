@@ -148,6 +148,16 @@ export default class CookingAssistantPlugin extends Plugin {
     return this.ledger?.serialize() ?? [];
   }
 
+  refreshRecipeDatabaseView() {
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_RECIPE_DATABASE);
+    leaves.forEach((leaf) => {
+      const view = leaf.view;
+      if (view instanceof CookingDatabaseView) {
+        view.refresh();
+      }
+    });
+  }
+
   private async activateCookingPlannerView() {
     const { workspace } = this.app;
     let leaf: WorkspaceLeaf | null = null;

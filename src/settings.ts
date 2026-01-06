@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import CookingAssistantPlugin from "./main";
+import type { RecipeIndexSort } from "./services/RecipeIndexService";
 
 export interface CookingAssistantSettings {
   geminiApiKey: string;
@@ -7,6 +8,11 @@ export interface CookingAssistantSettings {
   inboxFolder: string;
   archiveFolder: string;
   imagesFolder: string;
+  databaseSort: RecipeIndexSort;
+  databaseMarkedFilter: "all" | "marked" | "unmarked";
+  databaseScheduledFilter: "all" | "scheduled" | "unscheduled";
+  databaseCardMinWidth: number;
+  databaseMaxCards: number;
 }
 
 export const DEFAULT_SETTINGS: CookingAssistantSettings = {
@@ -14,7 +20,12 @@ export const DEFAULT_SETTINGS: CookingAssistantSettings = {
   recipesFolder: "recipes",
   inboxFolder: "inbox",
   archiveFolder: "inbox/archive",
-  imagesFolder: "recipes/images"
+  imagesFolder: "recipes/images",
+  databaseSort: "added-desc",
+  databaseMarkedFilter: "all",
+  databaseScheduledFilter: "all",
+  databaseCardMinWidth: 220,
+  databaseMaxCards: 500
 };
 
 export class CookingAssistantSettingTab extends PluginSettingTab {
@@ -82,6 +93,103 @@ export class CookingAssistantSettingTab extends PluginSettingTab {
           this.plugin.settings.archiveFolder = value.trim() || DEFAULT_SETTINGS.archiveFolder;
           await this.plugin.saveSettings();
         })
+      );
+
+    containerEl.createEl("h3", { text: "Recipe Database" });
+
+    new Setting(containerEl)
+      .setName("Sort order")
+      .setDesc("Default sort order for the Recipe Database view.")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOptions({
+            "added-desc": "Added (newest first)",
+            "added-asc": "Added (oldest first)",
+            "title-asc": "Title (A-Z)",
+            "title-desc": "Title (Z-A)",
+            "scheduled-desc": "Scheduled (latest first)",
+            "scheduled-asc": "Scheduled (oldest first)"
+          })
+          .setValue(this.plugin.settings.databaseSort)
+          .onChange(async (value) => {
+            this.plugin.settings.databaseSort = value as RecipeIndexSort;
+            await this.plugin.saveSettings();
+            this.plugin.refreshRecipeDatabaseView();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Marked filter")
+      .setDesc("Filter recipes by marked status.")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOptions({
+            all: "All recipes",
+            marked: "Marked only",
+            unmarked: "Unmarked only"
+          })
+          .setValue(this.plugin.settings.databaseMarkedFilter)
+          .onChange(async (value) => {
+            this.plugin.settings.databaseMarkedFilter = value as
+              | "all"
+              | "marked"
+              | "unmarked";
+            await this.plugin.saveSettings();
+            this.plugin.refreshRecipeDatabaseView();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Scheduled filter")
+      .setDesc("Filter recipes by scheduled status.")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOptions({
+            all: "All recipes",
+            scheduled: "Scheduled only",
+            unscheduled: "Unscheduled only"
+          })
+          .setValue(this.plugin.settings.databaseScheduledFilter)
+          .onChange(async (value) => {
+            this.plugin.settings.databaseScheduledFilter = value as
+              | "all"
+              | "scheduled"
+              | "unscheduled";
+            await this.plugin.saveSettings();
+            this.plugin.refreshRecipeDatabaseView();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Card minimum width")
+      .setDesc("Minimum width for recipe cards in the database grid (pixels).")
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.databaseCardMinWidth))
+          .onChange(async (value) => {
+            const parsed = Number.parseInt(value, 10);
+            this.plugin.settings.databaseCardMinWidth = Number.isFinite(parsed)
+              ? Math.max(160, parsed)
+              : DEFAULT_SETTINGS.databaseCardMinWidth;
+            await this.plugin.saveSettings();
+            this.plugin.refreshRecipeDatabaseView();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Max cards")
+      .setDesc("Limit cards rendered for performance. Use 0 for no limit.")
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.databaseMaxCards))
+          .onChange(async (value) => {
+            const parsed = Number.parseInt(value, 10);
+            this.plugin.settings.databaseMaxCards = Number.isFinite(parsed)
+              ? Math.max(0, parsed)
+              : DEFAULT_SETTINGS.databaseMaxCards;
+            await this.plugin.saveSettings();
+            this.plugin.refreshRecipeDatabaseView();
+          })
       );
   }
 }

@@ -45,6 +45,10 @@ export class CookingDatabaseView extends ItemView {
     this.contentEl.empty();
   }
 
+  refresh() {
+    this.scheduleRender();
+  }
+
   private scheduleRender() {
     if (this.refreshTimer !== null) {
       window.clearTimeout(this.refreshTimer);
@@ -56,16 +60,43 @@ export class CookingDatabaseView extends ItemView {
   }
 
   private render() {
-    const recipes = this.index.getRecipes({ sortBy: "added-desc" });
+    const settings = this.plugin.settings;
+    const filter = {
+      marked:
+        settings.databaseMarkedFilter === "marked"
+          ? true
+          : settings.databaseMarkedFilter === "unmarked"
+            ? false
+            : undefined,
+      scheduled:
+        settings.databaseScheduledFilter === "scheduled"
+          ? true
+          : settings.databaseScheduledFilter === "unscheduled"
+            ? false
+            : undefined
+    };
+    const allRecipes = this.index.getRecipes({
+      sortBy: settings.databaseSort,
+      filter
+    });
+    const maxCards = settings.databaseMaxCards;
+    const recipes =
+      maxCards && maxCards > 0 ? allRecipes.slice(0, maxCards) : allRecipes;
+    const isTruncated = recipes.length < allRecipes.length;
+
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("cooking-db");
+    const minWidth = Math.max(160, settings.databaseCardMinWidth || 220);
+    contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
 
     const header = contentEl.createEl("div", { cls: "cooking-db__header" });
     header.createEl("h2", { text: "Recipe Database" });
     header.createEl("div", {
       cls: "cooking-db__count",
-      text: `${recipes.length} recipes`
+      text: isTruncated
+        ? `${recipes.length} of ${allRecipes.length} recipes`
+        : `${allRecipes.length} recipes`
     });
 
     const grid = contentEl.createEl("div", { cls: "cooking-db__grid" });

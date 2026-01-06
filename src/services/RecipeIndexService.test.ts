@@ -59,7 +59,12 @@ describe("RecipeIndexService", () => {
       recipesFolder: "cooking/recipes",
       inboxFolder: "cooking/inbox",
       archiveFolder: "cooking/inbox/archive",
-      imagesFolder: "cooking/recipes/images"
+      imagesFolder: "cooking/recipes/images",
+      databaseSort: "added-desc",
+      databaseMarkedFilter: "all",
+      databaseScheduledFilter: "all",
+      databaseCardMinWidth: 220,
+      databaseMaxCards: 500
     }));
 
     const recipes = service.getRecipes({ sortBy: "title-asc" });
@@ -86,7 +91,12 @@ describe("RecipeIndexService", () => {
       recipesFolder: "recipes",
       inboxFolder: "inbox",
       archiveFolder: "inbox/archive",
-      imagesFolder: "recipes/images"
+      imagesFolder: "recipes/images",
+      databaseSort: "added-desc",
+      databaseMarkedFilter: "all",
+      databaseScheduledFilter: "all",
+      databaseCardMinWidth: 220,
+      databaseMaxCards: 500
     }));
 
     const sorted = service.getRecipes({ sortBy: "added-desc" });
@@ -106,7 +116,12 @@ describe("RecipeIndexService", () => {
       recipesFolder: "recipes",
       inboxFolder: "inbox",
       archiveFolder: "inbox/archive",
-      imagesFolder: "recipes/images"
+      imagesFolder: "recipes/images",
+      databaseSort: "added-desc",
+      databaseMarkedFilter: "all",
+      databaseScheduledFilter: "all",
+      databaseCardMinWidth: 220,
+      databaseMaxCards: 500
     }));
 
     await service.setMarked("recipes/alpha.md", true);
