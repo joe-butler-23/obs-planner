@@ -16,5 +16,5 @@
     "isolatedModules": true,
     "types": ["obsidian", "node"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "organiser/src/**/*"]
 }

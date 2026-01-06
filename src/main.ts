@@ -1,10 +1,11 @@
-import { Notice, Plugin, TAbstractFile, TFile } from "obsidian";
+import { Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
 import { CaptureModal } from "./components/CaptureModal";
 import { CookingAssistantSettingTab, CookingAssistantSettings, DEFAULT_SETTINGS } from "./settings";
 import { GeminiService } from "./services/GeminiService";
 import { InboxWatcher } from "./services/InboxWatcher";
 import { LedgerEntry, LedgerStore } from "./services/LedgerStore";
 import { RecipeWriter } from "./services/RecipeWriter";
+import { VIEW_TYPE_WEEKLY_ORGANISER, WeeklyOrganiserView } from "../organiser/src/view";
 
 interface CookingAssistantData {
   settings: CookingAssistantSettings;
@@ -36,6 +37,23 @@ export default class CookingAssistantPlugin extends Plugin {
       (message) => new Notice(message)
     );
 
+    this.registerView(
+      VIEW_TYPE_WEEKLY_ORGANISER,
+      (leaf) => new WeeklyOrganiserView(leaf)
+    );
+
+    this.addRibbonIcon("calendar-days", "Weekly Organiser", () => {
+      this.activateWeeklyOrganiserView();
+    });
+
+    this.addCommand({
+      id: "open-weekly-organiser",
+      name: "Open Weekly Organiser",
+      callback: () => {
+        this.activateWeeklyOrganiserView();
+      }
+    });
+
     // Event-driven inbox watcher (create/modify in inbox folder)
     this.registerEvent(this.app.vault.on("create", async (file) => this.handleFileEvent(file)));
     this.registerEvent(this.app.vault.on("modify", async (file) => this.handleFileEvent(file)));
@@ -53,7 +71,7 @@ export default class CookingAssistantPlugin extends Plugin {
   }
 
   async onunload() {
-    // No-op: registerEvent/registerInterval are auto-cleaned by Plugin base class
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_WEEKLY_ORGANISER);
   }
 
   private async handleFileEvent(file: TAbstractFile) {
@@ -88,5 +106,23 @@ export default class CookingAssistantPlugin extends Plugin {
 
   async saveSettings() {
     await this.savePluginData();
+  }
+
+  private async activateWeeklyOrganiserView() {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | null = null;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_WEEKLY_ORGANISER);
+
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      leaf = workspace.getLeaf(true);
+      await leaf.setViewState({
+        type: VIEW_TYPE_WEEKLY_ORGANISER,
+        active: true
+      });
+    }
+
+    workspace.revealLeaf(leaf);
   }
 }
