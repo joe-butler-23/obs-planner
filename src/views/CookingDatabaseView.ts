@@ -101,9 +101,11 @@ export class CookingDatabaseView extends ItemView {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("cooking-db");
-    const minWidth = Math.max(160, this.plugin.settings.databaseCardMinWidth || 220);
+    const baseWidth = Math.max(160, this.plugin.settings.databaseCardMinWidth || 220);
+    const minWidth = Math.max(160, baseWidth - 20);
+    const maxWidth = Math.max(minWidth, baseWidth + 40);
     contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
-    contentEl.style.setProperty("--cooking-db-card-size", `${minWidth}px`);
+    contentEl.style.setProperty("--cooking-db-card-max", `${maxWidth}px`);
 
     const header = contentEl.createEl("div", { cls: "cooking-db__header" });
     header.createEl("h2", { text: "Recipe Database" });
@@ -149,7 +151,7 @@ export class CookingDatabaseView extends ItemView {
 
     const tagWrapper = controls.createEl("div", { cls: "cooking-db__tag-filter" });
     this.tagButton = tagWrapper.createEl("button", {
-      cls: "cooking-db__tag-toggle",
+      cls: "cooking-db__select cooking-db__tag-toggle",
       attr: {
         type: "button",
         "aria-haspopup": "listbox",
@@ -200,6 +202,7 @@ export class CookingDatabaseView extends ItemView {
     });
 
     this.gridEl = contentEl.createEl("div", { cls: "cooking-db__grid" });
+    this.setTagMenuOpen(false);
   }
 
   private renderList() {
@@ -237,9 +240,11 @@ export class CookingDatabaseView extends ItemView {
     const tags = this.index.getAvailableTags();
     this.updateTagOptions(tags);
 
-    const minWidth = Math.max(160, settings.databaseCardMinWidth || 220);
+    const baseWidth = Math.max(160, settings.databaseCardMinWidth || 220);
+    const minWidth = Math.max(160, baseWidth - 20);
+    const maxWidth = Math.max(minWidth, baseWidth + 40);
     this.contentEl.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
-    this.contentEl.style.setProperty("--cooking-db-card-size", `${minWidth}px`);
+    this.contentEl.style.setProperty("--cooking-db-card-max", `${maxWidth}px`);
 
     const scrollTop = this.contentEl.scrollTop;
 
