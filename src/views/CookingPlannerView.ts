@@ -19,4 +19,14 @@ export class CookingPlannerView extends WeeklyOrganiserView {
   getIcon() {
     return "calendar-days";
   }
+
+  async onOpen() {
+    await super.onOpen();
+    this.contentEl.addClass("cooking-planner-view");
+  }
+
+  async onClose() {
+    this.contentEl.removeClass("cooking-planner-view");
+    await super.onClose();
+  }
 }

@@ -310,3 +310,14 @@
   color: var(--text-muted);
   padding: 12px 0;
 }
+
+.cooking-planner-view .card-cover {
+  aspect-ratio: 1 / 1 !important;
+}
+
+.cooking-planner-view
+  .kanban-board:not([data-id="marked"])
+  .kanban-drag:has(> :nth-child(2))
+  .card-cover {
+  aspect-ratio: 1 / 1 !important;
+}
