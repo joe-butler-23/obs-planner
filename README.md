@@ -33,3 +33,8 @@ Unified Obsidian-first workflow for the cooking project:
 
 ## Current status
 - Repository scaffold in progress. Next steps: wire organiser submodule, implement inbox watcher + recipe writer, add schema/de-dupe tests.
+
+## Testing / validation plan
+- **Unit (Vitest):** inbox schema parsing (zod), dedupe ledger behavior, slug collision handling, frontmatter generation invariants (.webp cover enforcement).
+- **Integration (vault sim):** stub vault API to confirm inbox event handling routes jobs to writer, archive/quarantine paths are created, and duplicate slugs are rejected.
+- **Manual smoke:** drop URL/text/image jobs into `inbox/` in a throwaway vault, verify notices, archive/error files, and recipe frontmatter fields. Ensure Weekly Organiser board still reads `scheduled/marked` once wired.
