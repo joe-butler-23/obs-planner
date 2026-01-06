@@ -57,6 +57,23 @@ flowchart TD
 - **Integration (vault sim):** inbox event handling routes jobs to writer, archive/quarantine paths created, `.webp` covers written.
 - **Manual smoke:** drop URL/text/image jobs into `inbox/`, verify notices, archive/error files, recipe content, and Weekly Organiser behavior.
 
+## Planned: Recipe Database view (performance-first)
+1) Fast index service + tests
+   - Cached index keyed by file path, derived from metadataCache + minimal file stats.
+   - Filter strictly by configurable recipes folder.
+   - Precompute fields (title, cover path, marked, added, scheduled) once per file.
+   - Unit tests for filtering, sorting, marked toggle, and cover resolution.
+2) View UI (fast render path)
+   - Responsive card grid with minimal DOM per card.
+   - Lazy image loading and CSS contain/size to avoid layout thrash.
+   - Ctrl/Cmd click opens in a new pane; normal click in current pane.
+   - Marked checkbox updates frontmatter via processFrontMatter.
+   - Debounced refresh on vault/metadata changes (avoid full re-render).
+3) Config + docs + performance toggles
+   - Settings: recipes folder, sort order, filters (marked/scheduled), card density/columns.
+   - Performance toggles: max cards rendered, optional virtualized list if large vault.
+   - README update, npm test, npm run build, commit in small increments.
+
 ## Dev workflow (Obsidian hot-reload loop)
 1) Build/watch the plugin and symlink into your vault:
 ```bash
