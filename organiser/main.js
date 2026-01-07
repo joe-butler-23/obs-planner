@@ -30076,7 +30076,17 @@ var renderWeeklyOrganiserCard = (app, item) => {
     exercise: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>`,
     task: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="m9 12 2 2 4-4"/></svg>`
   };
-  const icon = (_a = iconByType[item.type]) != null ? _a : iconByType.task;
+  const isRecipe = item.type === "recipe";
+  const isScheduled = Boolean(item.date);
+  const icon = isRecipe && !isScheduled ? `<label class="organiser-card__marked-toggle">
+				<input
+					type="checkbox"
+					class="organiser-card__marked-input"
+					data-item-id="${escapeHtml(item.id)}"
+					aria-label="Marked"
+					${item.marked ? "checked" : ""}
+				/>
+			</label>` : (_a = iconByType[item.type]) != null ? _a : iconByType.task;
   const title = escapeHtml(toSafeString(item.title));
   const coverImage = resolveCoverImage(app, item);
   const escapedCoverImage = coverImage ? escapeHtml(coverImage) : "";
@@ -30416,6 +30426,7 @@ var useKanbanBoard = (options) => {
   const kanbanInstanceRef = React.useRef(null);
   const lastDragTimeRef = React.useRef(0);
   const isDragInProgressRef = React.useRef(false);
+  const clickSuppressUntilRef = React.useRef(0);
   const lastForceSplitRef = React.useRef(null);
   const lastInternalUpdateRef = React.useRef(0);
   const refreshTimerRef = React.useRef(null);
@@ -30497,6 +30508,7 @@ var useKanbanBoard = (options) => {
             var _a2;
             if (el.classList.contains("kanban-group-header")) return;
             isDragInProgressRef.current = true;
+            clickSuppressUntilRef.current = Date.now() + clickBlockMs;
             el.classList.add("is-dragging");
             console.log(
               `[${logPrefix}] drag start`,
@@ -30509,6 +30521,7 @@ var useKanbanBoard = (options) => {
             el.classList.remove("is-dragging");
             isDragInProgressRef.current = false;
             lastDragTimeRef.current = Date.now();
+            clickSuppressUntilRef.current = Date.now() + clickBlockMs;
             console.log(
               `[${logPrefix}] drag end`,
               (_a2 = el.dataset.eid) != null ? _a2 : "unknown"
@@ -30524,6 +30537,7 @@ var useKanbanBoard = (options) => {
             const targetBoardId = targetBoardEl == null ? void 0 : targetBoardEl.dataset.id;
             if (itemId && targetBoardId) {
               lastDragTimeRef.current = Date.now();
+              clickSuppressUntilRef.current = Date.now() + clickBlockMs;
               lastInternalUpdateRef.current = Date.now();
               Promise.resolve(onDropItem(itemId, targetBoardId)).catch(
                 (err) => {
@@ -30903,7 +30917,7 @@ var useKanbanBoard = (options) => {
       onCardClick(event, itemId, itemEl);
     };
     const handleClick = (event) => {
-      var _a, _b, _c;
+      var _a, _b, _c, _d;
       const target = event.target;
       if (!target) {
         console.log(`[${logPrefix}] click ignored: no target`);
@@ -30928,12 +30942,19 @@ var useKanbanBoard = (options) => {
         );
         return;
       }
+      if (Date.now() < clickSuppressUntilRef.current) {
+        console.log(
+          `[${logPrefix}] click ignored: drag suppress window`,
+          (_c = itemEl.dataset.eid) != null ? _c : "unknown"
+        );
+        return;
+      }
       const timeSinceDrag = Date.now() - lastDragTimeRef.current;
       if (timeSinceDrag < clickBlockMs || itemEl.classList.contains("is-dragging") || itemEl.classList.contains("is-moving")) {
         console.log(
           `[${logPrefix}] click ignored: drag cooldown`,
           {
-            itemId: (_c = itemEl.dataset.eid) != null ? _c : "unknown",
+            itemId: (_d = itemEl.dataset.eid) != null ? _d : "unknown",
             timeSinceDrag,
             clickBlockMs,
             isDragging: itemEl.classList.contains("is-dragging"),
@@ -31086,7 +31107,10 @@ var findPresetById = (id) => {
 
 // src/components/WeeklyOrganiserBoard.tsx
 var momentFn4 = import_obsidian6.moment;
-var WeeklyOrganiserBoard = ({ app }) => {
+var WeeklyOrganiserBoard = ({
+  app,
+  onSendShoppingList
+}) => {
   const [activePresetId, setActivePresetId] = React3.useState(ORGANISER_PRESETS[0].id);
   const [searchQuery, setSearchQuery] = React3.useState("");
   const [activePopover, setActivePopover] = React3.useState(null);
@@ -31267,10 +31291,66 @@ var WeeklyOrganiserBoard = ({ app }) => {
     groupLabel,
     groupOrder
   });
+  React3.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const stopIfToggle = (event) => {
+      const target = event.target;
+      if (!target) return;
+      if (!target.closest(".organiser-card__marked-toggle")) return;
+      event.stopPropagation();
+    };
+    const handleChange = async (event) => {
+      const target = event.target;
+      if (!(target == null ? void 0 : target.classList.contains("organiser-card__marked-input"))) return;
+      event.stopPropagation();
+      const itemId = target.dataset.itemId;
+      if (!itemId) return;
+      const file = app.vault.getAbstractFileByPath(itemId);
+      if (!(file instanceof import_obsidian6.TFile)) return;
+      target.disabled = true;
+      try {
+        await app.fileManager.processFrontMatter(file, (frontmatter) => {
+          if (target.checked) {
+            frontmatter.marked = true;
+          } else {
+            delete frontmatter.marked;
+          }
+        });
+      } finally {
+        target.disabled = false;
+      }
+    };
+    container.addEventListener("mousedown", stopIfToggle, true);
+    container.addEventListener("click", stopIfToggle, true);
+    container.addEventListener("change", handleChange);
+    return () => {
+      container.removeEventListener("mousedown", stopIfToggle, true);
+      container.removeEventListener("click", stopIfToggle, true);
+      container.removeEventListener("change", handleChange);
+    };
+  }, [app, containerRef]);
   const startDate = momentFn4().add(weekOffset, "weeks").startOf("isoWeek");
   const endDate = startDate.clone().add(6, "days");
   const weekRangeDisplay = `${startDate.format("MMM Do")} - ${endDate.format("MMM Do, YYYY")}`;
   const startDateValue = startDate.format("YYYY-MM-DD");
+  const handleSendShoppingList = React3.useCallback(() => {
+    if (!onSendShoppingList) return;
+    const { entriesByFile } = buildBoardEntries(app, config, {
+      logPrefix: "WeeklyOrganiser",
+      logItemErrors: false
+    });
+    const recipePaths = Array.from(entriesByFile.values()).filter((entry) => entry.item.type === "recipe" && entry.item.date).map((entry) => entry.filePath);
+    if (recipePaths.length === 0) {
+      new import_obsidian6.Notice("No scheduled recipes found for this week.");
+      return;
+    }
+    onSendShoppingList({
+      recipePaths,
+      weekLabel: weekRangeDisplay,
+      weekOffset
+    });
+  }, [app, config, onSendShoppingList, weekOffset, weekRangeDisplay]);
   const handleCalendarSelect = React3.useCallback((date) => {
     if (!date) return;
     const selected = momentFn4(date);
@@ -31418,7 +31498,17 @@ var WeeklyOrganiserBoard = ({ app }) => {
       "aria-label": "Next week"
     },
     /* @__PURE__ */ React3.createElement("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React3.createElement("polyline", { points: "9 18 15 12 9 6" }))
-  ), /* @__PURE__ */ React3.createElement("span", { className: "week-range" }, weekRangeDisplay)), /* @__PURE__ */ React3.createElement("div", { className: "topbar-actions" }, /* @__PURE__ */ React3.createElement("div", { className: "topbar-action" }, /* @__PURE__ */ React3.createElement(
+  ), /* @__PURE__ */ React3.createElement("span", { className: "week-range" }, weekRangeDisplay)), /* @__PURE__ */ React3.createElement("div", { className: "topbar-actions" }, onSendShoppingList && /* @__PURE__ */ React3.createElement("div", { className: "topbar-action" }, /* @__PURE__ */ React3.createElement(
+    "button",
+    {
+      className: "topbar-icon-btn",
+      type: "button",
+      title: "Send shopping list to Todoist",
+      "aria-label": "Send shopping list to Todoist",
+      onClick: handleSendShoppingList
+    },
+    /* @__PURE__ */ React3.createElement("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React3.createElement("circle", { cx: "9", cy: "21", r: "1" }), /* @__PURE__ */ React3.createElement("circle", { cx: "20", cy: "21", r: "1" }), /* @__PURE__ */ React3.createElement("path", { d: "M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" }))
+  )), /* @__PURE__ */ React3.createElement("div", { className: "topbar-action" }, /* @__PURE__ */ React3.createElement(
     "button",
     {
       ref: filterButtonRef,
@@ -31498,9 +31588,13 @@ var WeeklyOrganiserBoard = ({ app }) => {
 // src/view.tsx
 var VIEW_TYPE_WEEKLY_ORGANISER = "weekly-organiser-view";
 var WeeklyOrganiserView = class extends import_obsidian7.ItemView {
-  constructor(leaf) {
+  constructor(leaf, onSendShoppingList) {
     super(leaf);
     this.root = null;
+    this.onSendShoppingList = onSendShoppingList;
+  }
+  setOnSendShoppingList(handler) {
+    this.onSendShoppingList = handler;
   }
   getViewType() {
     return VIEW_TYPE_WEEKLY_ORGANISER;
@@ -31516,7 +31610,13 @@ var WeeklyOrganiserView = class extends import_obsidian7.ItemView {
     console.log("[WeeklyOrganiserView] onOpen");
     this.root = (0, import_client.createRoot)(this.contentEl);
     this.root.render(
-      /* @__PURE__ */ React4.createElement(React4.StrictMode, null, /* @__PURE__ */ React4.createElement("div", { className: "weekly-organiser-view-container" }, /* @__PURE__ */ React4.createElement(WeeklyOrganiserBoard, { app: this.app })))
+      /* @__PURE__ */ React4.createElement(React4.StrictMode, null, /* @__PURE__ */ React4.createElement("div", { className: "weekly-organiser-view-container" }, /* @__PURE__ */ React4.createElement(
+        WeeklyOrganiserBoard,
+        {
+          app: this.app,
+          onSendShoppingList: this.onSendShoppingList
+        }
+      )))
     );
   }
   async onClose() {
