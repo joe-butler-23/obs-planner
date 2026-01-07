@@ -1,3 +1,5 @@
+![Mise en Place Banner](media/mise-en-place-banner.png)
+
 # Mise en Place
 
 Unified Obsidian-first workflow for the cooking project:
