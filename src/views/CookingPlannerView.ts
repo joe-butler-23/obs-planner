@@ -42,6 +42,7 @@ export class CookingPlannerView extends WeeklyOrganiserView {
   }
 
   private async handleSendShoppingList(payload: WeeklyOrganiserShoppingListPayload) {
+    new Notice("Sending shopping list to Todoist...");
     await this.todoistService.sendShoppingList({
       recipePaths: payload.recipePaths,
       weekLabel: payload.weekLabel

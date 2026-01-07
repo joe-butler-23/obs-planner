@@ -70,6 +70,17 @@ export class CookingHealthView extends ItemView {
       this.render();
     });
 
+    const clearButton = controls.createEl("button", {
+      cls: "mod-warning",
+      text: "Clear log"
+    });
+    clearButton.addEventListener("click", () => {
+      if (confirm("Are you sure you want to clear the activity log?")) {
+        this.plugin.clearLedger();
+        this.render();
+      }
+    });
+
     const summary = contentEl.createEl("div", { cls: "cooking-health__summary" });
     const pending = summary.createEl("div", { cls: "cooking-health__metric" });
     pending.createEl("div", { cls: "cooking-health__metric-label", text: "Pending" });

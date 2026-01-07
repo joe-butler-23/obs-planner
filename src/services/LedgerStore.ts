@@ -53,6 +53,11 @@ export class LedgerStore {
     this.flush();
   }
 
+  clear() {
+    this.entries.clear();
+    this.flush();
+  }
+
   serialize(): LedgerEntry[] {
     return Array.from(this.entries.values()).sort((a, b) =>
       a.processedAt.localeCompare(b.processedAt)

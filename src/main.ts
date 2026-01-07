@@ -149,6 +149,10 @@ export default class CookingAssistantPlugin extends Plugin {
     return this.ledger?.serialize() ?? [];
   }
 
+  clearLedger() {
+    this.ledger?.clear();
+  }
+
   recordLedgerEntry(status: LedgerStatus, key: string, detail?: string) {
     if (!this.ledger) return;
     if (status === "success") {
