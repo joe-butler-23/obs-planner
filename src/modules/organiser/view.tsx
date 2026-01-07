@@ -5,11 +5,13 @@ import {
 	WeeklyOrganiserBoard,
 	WeeklyOrganiserShoppingListPayload,
 } from "./components/WeeklyOrganiserBoard";
+import { ORGANISER_PRESETS, OrganiserPreset } from "./presets/organiserPresets";
 
 export const VIEW_TYPE_WEEKLY_ORGANISER = "weekly-organiser-view";
 
 export class WeeklyOrganiserView extends ItemView {
 	root: Root | null = null;
+	protected presets: OrganiserPreset[] = ORGANISER_PRESETS;
 	private onSendShoppingList?: (
 		payload: WeeklyOrganiserShoppingListPayload
 	) => void;
@@ -51,6 +53,7 @@ export class WeeklyOrganiserView extends ItemView {
 				<div className="weekly-organiser-view-container">
 					<WeeklyOrganiserBoard
 						app={this.app}
+						presets={this.presets}
 						onSendShoppingList={this.onSendShoppingList}
 					/>
 				</div>

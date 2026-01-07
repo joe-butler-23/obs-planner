@@ -2,7 +2,7 @@ import { App, normalizePath, TFile } from "obsidian";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { CookingAssistantSettings } from "../settings";
-import { GeminiService } from "./GeminiService";
+import { GeminiService } from "../modules/cooking/services/GeminiService";
 import { LedgerStore } from "./LedgerStore";
 import { DuplicateRecipeError, RecipeWriter } from "../modules/cooking/services/RecipeWriter";
 

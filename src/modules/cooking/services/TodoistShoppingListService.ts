@@ -1,17 +1,19 @@
 import { App, Modal, Notice, TFile, moment } from "obsidian";
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import CookingAssistantPlugin from "../../../main";
+import {
+  TodoistApi,
+  TodoistTaskPayload,
+  SHOPPING_PROJECT_ID,
+  BRIDGE_CLUB_PROJECT_MATCH
+} from "./TodoistApi";
 
-const execFileAsync = promisify(execFile);
 const ModalBase = (Modal ?? class {}) as typeof Modal;
 
-const SHOPPING_PROJECT_ID = "2353762598";
 const DEFAULT_LABEL = "tinned-jarred-dried";
-const BRIDGE_CLUB_PROJECT_MATCH = "bridge club";
+
 const SESSION_LOG_PATH = path.join(
   os.homedir(),
   "projects",
@@ -70,13 +72,6 @@ type AggregatedItem = {
   unit: "g" | "ml" | "count" | null;
   countUnit: string | null;
   sources: Set<string>;
-};
-
-type TodoistTaskPayload = {
-  content: string;
-  labels?: string[];
-  due_date?: string;
-  section_id?: string;
 };
 
 type ConfirmSummary = {
@@ -581,7 +576,7 @@ const normalizeCountUnitToken = (token: string | undefined): string | null => {
 const sanitizeIngredientName = (value: string): string => {
   let cleaned = value;
 
-  cleaned = cleaned.replace(/\(.*?\)/g, "");
+  cleaned = cleaned.replace(/\(.*\)/g, "");
   cleaned = cleaned.split(/[,;].*/)[0] ?? cleaned;
 
   for (const phrase of PREP_PHRASES) {
@@ -590,7 +585,7 @@ const sanitizeIngredientName = (value: string): string => {
   }
 
   cleaned = cleaned.replace(/\b(of|and|with)\b\s*$/i, "");
-  cleaned = normalizeSpaces(cleaned.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, ""));
+  cleaned = normalizeSpaces(cleaned.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, " "));
 
   for (const alias of INGREDIENT_ALIASES) {
     if (alias.pattern.test(cleaned)) {
@@ -606,7 +601,7 @@ const abbreviateRecipeTitle = (title: string): string => {
   const words = title
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
+    .split(/\s+/) // Split by one or more whitespace characters
     .filter(Boolean);
   const filtered = words.filter((word) => !STOP_WORDS.has(word));
   const selected = (filtered.length > 0 ? filtered : words).slice(0, 3);
@@ -645,7 +640,7 @@ const convertToMetric = (
 const normalizeNameForKey = (name: string): string => {
   const cleaned = name
     .toLowerCase()
-    .replace(/\(.*?\)/g, "")
+    .replace(/\(.*\)/g, "")
     .replace(/\b(optional|to taste)\b/g, "")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -947,7 +942,11 @@ class TodoistConfirmModal extends ModalBase {
 }
 
 export class TodoistShoppingListService {
-  constructor(private app: App, private plugin: CookingAssistantPlugin) {}
+  private readonly api: TodoistApi;
+
+  constructor(private app: App, private plugin: CookingAssistantPlugin) {
+    this.api = new TodoistApi(app, plugin);
+  }
 
   async sendShoppingList(payload: { recipePaths: string[]; weekLabel: string }) {
     const ledgerKey = this.createLedgerKey(payload.weekLabel);
@@ -1034,7 +1033,7 @@ export class TodoistShoppingListService {
       const bridgeProject = await this.resolveBridgeClubProject();
       bridgeClubProjectId = bridgeProject.id;
       bridgeClubProjectName = bridgeProject.name;
-      const existingBridgeTasks = await this.listTodoistTasks(bridgeClubProjectId);
+      const existingBridgeTasks = await this.api.listTasks(bridgeClubProjectId);
       bridgeClubBaseline = existingBridgeTasks.length;
       const desiredBridgeTasks = buildBridgeClubTasks(recipes);
       const existingKeys = new Set(
@@ -1063,7 +1062,7 @@ export class TodoistShoppingListService {
 
     let baselineCount = 0;
     try {
-      const current = await this.listTodoistTasks();
+      const current = await this.api.listTasks();
       baselineCount = current.length;
     } catch (error) {
       new Notice("Todoist list failed. Check TODOIST_TOKEN.");
@@ -1106,9 +1105,12 @@ export class TodoistShoppingListService {
     let bridgeClubCreated: Array<{ id: string; content: string; due?: { date?: string } }> = [];
     if (bridgeClubProjectId && bridgeClubTasks.length > 0) {
       try {
-        bridgeClubCreated = await this.createBridgeClubTasks(
-          bridgeClubTasks,
-          bridgeClubProjectId
+        bridgeClubCreated = await this.api.createBatch(
+          bridgeClubProjectId,
+          bridgeClubTasks.map((task) => ({
+            content: task.content,
+            due_date: task.dueDate
+          }))
         );
       } catch (error) {
         new Notice("Bridge club create failed. Check token and logs.");
@@ -1124,7 +1126,13 @@ export class TodoistShoppingListService {
 
     let created: Array<{ id: string; content: string; labels: string[] }> = [];
     try {
-      created = await this.createTodoistTasks(items);
+      created = await this.api.createBatch(
+        SHOPPING_PROJECT_ID,
+        items.map((item) => ({
+          content: item.content,
+          labels: item.labels
+        }))
+      );
     } catch (error) {
       new Notice("Todoist create failed. Check token and logs.");
       this.plugin.recordLedgerEntry(
@@ -1212,42 +1220,8 @@ export class TodoistShoppingListService {
     });
   }
 
-  private getTodoistScriptPath(): string {
-    const vaultPath = this.app.vault.adapter.getBasePath();
-    const configDir = this.app.vault.configDir || ".obsidian";
-    const pluginId = this.plugin.manifest.id;
-    const normalized = path.normalize(vaultPath);
-    const pluginsSuffix = path.join(configDir, "plugins");
-
-    if (normalized.endsWith(pluginsSuffix)) {
-      return path.join(normalized, pluginId, "scripts", "todoist_client.py");
-    }
-    if (normalized.endsWith(configDir)) {
-      return path.join(normalized, "plugins", pluginId, "scripts", "todoist_client.py");
-    }
-    return path.join(normalized, configDir, "plugins", pluginId, "scripts", "todoist_client.py");
-  }
-
-  private async runTodoistCommand(args: string[]): Promise<string> {
-    const scriptPath = this.getTodoistScriptPath();
-    const { stdout } = await execFileAsync("python3", [scriptPath, ...args], {
-      maxBuffer: 1024 * 1024 * 5
-    });
-    return stdout;
-  }
-
-  private async listTodoistTasks(projectId: string = SHOPPING_PROJECT_ID): Promise<any[]> {
-    const output = await this.runTodoistCommand(["list", "--project", projectId]);
-    return JSON.parse(output);
-  }
-
-  private async listTodoistProjects(): Promise<Array<{ id: string; name: string }>> {
-    const output = await this.runTodoistCommand(["projects"]);
-    return JSON.parse(output);
-  }
-
   private async resolveBridgeClubProject(): Promise<{ id: string; name: string }> {
-    const projects = await this.listTodoistProjects();
+    const projects = await this.api.listProjects();
     const match = projects.find((project) =>
       project.name.toLowerCase().includes(BRIDGE_CLUB_PROJECT_MATCH)
     );
@@ -1255,53 +1229,6 @@ export class TodoistShoppingListService {
       throw new Error("Bridge club project not found");
     }
     return { id: match.id, name: match.name };
-  }
-
-  private async createTodoistTasks(items: ShoppingItem[]) {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "todoist-"));
-    const payloadPath = path.join(tmpDir, "tasks.json");
-    const payload: TodoistTaskPayload[] = items.map((item) => ({
-      content: item.content,
-      labels: item.labels
-    }));
-    await fs.writeFile(payloadPath, JSON.stringify(payload, null, 2), "utf8");
-
-    try {
-      const output = await this.runTodoistCommand([
-        "create-batch",
-        "--project",
-        SHOPPING_PROJECT_ID,
-        "--file",
-        payloadPath
-      ]);
-      return JSON.parse(output);
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  }
-
-  private async createBridgeClubTasks(tasks: BridgeClubTask[], projectId: string) {
-    if (tasks.length === 0) return [];
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "todoist-"));
-    const payloadPath = path.join(tmpDir, "tasks.json");
-    const payload: TodoistTaskPayload[] = tasks.map((task) => ({
-      content: task.content,
-      due_date: task.dueDate
-    }));
-    await fs.writeFile(payloadPath, JSON.stringify(payload, null, 2), "utf8");
-
-    try {
-      const output = await this.runTodoistCommand([
-        "create-batch",
-        "--project",
-        projectId,
-        "--file",
-        payloadPath
-      ]);
-      return JSON.parse(output);
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
   }
 
   private async writePreview(

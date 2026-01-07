@@ -1,7 +1,7 @@
 import { Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
 import { CaptureModal } from "./components/CaptureModal";
 import { CookingAssistantSettingTab, CookingAssistantSettings, DEFAULT_SETTINGS } from "./settings";
-import { GeminiService } from "./services/GeminiService";
+import { GeminiService } from "./modules/cooking/services/GeminiService";
 import { InboxWatcher } from "./services/InboxWatcher";
 import { LedgerEntry, LedgerStatus, LedgerStore } from "./services/LedgerStore";
 import { RecipeWriter } from "./modules/cooking/services/RecipeWriter";

@@ -6,7 +6,7 @@ import { useKanbanBoard } from "../hooks/useKanbanBoard";
 import { usePikadayDatePicker } from "../hooks/usePikadayDatePicker";
 import {
 	findPresetById,
-	ORGANISER_PRESETS,
+	OrganiserPreset,
 	OrganiserPresetId,
 } from "../presets/organiserPresets";
 import { OrganiserItem } from "../types";
@@ -18,6 +18,7 @@ const momentFn: any = moment;
 
 interface WeeklyOrganiserBoardProps {
 	app: App;
+	presets: OrganiserPreset[];
 	onSendShoppingList?: (payload: WeeklyOrganiserShoppingListPayload) => void;
 }
 
@@ -32,10 +33,11 @@ export type WeeklyOrganiserShoppingListPayload = {
  */
 export const WeeklyOrganiserBoard = ({
 	app,
+	presets,
 	onSendShoppingList,
 }: WeeklyOrganiserBoardProps) => {
 	const [activePresetId, setActivePresetId] =
-		React.useState<OrganiserPresetId>(ORGANISER_PRESETS[0].id);
+		React.useState<OrganiserPresetId>(presets[0]?.id);
 	const [searchQuery, setSearchQuery] = React.useState("");
 	const [activePopover, setActivePopover] = React.useState<
 		"filter" | "group" | "sort" | null
@@ -62,8 +64,8 @@ export const WeeklyOrganiserBoard = ({
 	const lastOpenLeafRef = React.useRef<WorkspaceLeaf | null>(null);
 
 	const activePreset = React.useMemo(
-		() => findPresetById(activePresetId),
-		[activePresetId]
+		() => findPresetById(activePresetId, presets),
+		[activePresetId, presets]
 	);
 
 	const fieldManager = React.useMemo(() => new FieldManager(app), [app]);
@@ -440,7 +442,7 @@ export const WeeklyOrganiserBoard = ({
 						)
 					}
 				>
-					{ORGANISER_PRESETS.map((preset) => (
+					{presets.map((preset) => (
 						<option key={preset.id} value={preset.id}>
 							{preset.label}
 						</option>
