@@ -1,18 +1,14 @@
 import * as React from "react";
 import { setIcon } from "obsidian";
 import * as ReactWindow from "react-window";
-import AutoSizerSource from "react-virtualized-auto-sizer";
 import { RecipeIndexItem, RecipeIndexSort } from "../../modules/cooking/types";
 import { CookingAssistantSettings } from "../../settings";
 
-const AutoSizer = (AutoSizerSource as any).default ?? AutoSizerSource;
+// Safe import for react-window
 const FixedSizeGrid = ReactWindow.FixedSizeGrid;
 const areEqual = ReactWindow.areEqual;
-const { GridChildComponentProps } = ReactWindow; // Type import, might need separate import statement if using TS
-// Types must be imported separately if using 'import *' in some configs, or just use import type.
-// But 'import *' includes types.
-// Wait, 'GridChildComponentProps' is a type. 'const { ... } = ReactWindow' won't work for types at runtime.
-// I should keep the named import for types.
+// Types must be imported separately
+import { GridChildComponentProps } from "react-window";
 
 export type MarkedFilter = "all" | "marked" | "unmarked";
 export type ScheduledFilter = "all" | "scheduled" | "unscheduled";
@@ -88,6 +84,8 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
 }) => {
   const [search, setSearch] = React.useState(state.search);
   const [tagMenuOpen, setTagMenuOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [gridSize, setGridSize] = React.useState({ width: 0, height: 0 });
 
   // Sync local search if prop changes
   React.useEffect(() => {
@@ -119,6 +117,53 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, [tagMenuOpen]);
+
+  // Custom AutoSizer logic using ResizeObserver
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setGridSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        });
+      }
+    });
+
+    observer.observe(container);
+    // Initial size
+    setGridSize({
+      width: container.clientWidth,
+      height: container.clientHeight
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Grid calculation
+  const GAP = 12;
+  const MIN_CARD_WIDTH = Math.max(160, settings.databaseCardMinWidth || 220);
+  const scaledBase = Math.max(140, Math.round(MIN_CARD_WIDTH * 0.8));
+  const minWidth = Math.max(140, scaledBase - 12);
+  const columnCount = Math.max(1, Math.floor((gridSize.width + GAP) / (minWidth + GAP)));
+  const totalGapSpace = GAP * (columnCount - 1);
+  const availableWidth = Math.max(0, gridSize.width - totalGapSpace);
+  const cardWidth = Math.floor(availableWidth / columnCount);
+  const rowCount = Math.ceil(recipes.length / columnCount);
+  const cardHeight = cardWidth + 110;
+
+  const itemData: GridData = {
+    recipes,
+    columnCount,
+    cardWidth,
+    cardHeight,
+    gap: GAP,
+    resolveCover,
+    onOpenRecipe,
+    onToggleMarked
+  };
 
   return (
     <div className="cooking-db">
@@ -237,53 +282,20 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
         </select>
       </div>
 
-      <div className="cooking-db__grid-container">
-        <AutoSizer>
-          {({ height, width }) => {
-            const GAP = 12;
-            const MIN_CARD_WIDTH = Math.max(160, settings.databaseCardMinWidth || 220);
-            
-            // Calculate scale similar to old CSS logic
-            const scaledBase = Math.max(140, Math.round(MIN_CARD_WIDTH * 0.8));
-            const minWidth = Math.max(140, scaledBase - 12);
-            
-            // Calculate columns
-            const columnCount = Math.max(1, Math.floor((width + GAP) / (minWidth + GAP)));
-            
-            // Distribute remaining space
-            const totalGapSpace = GAP * (columnCount - 1);
-            const availableWidth = width - totalGapSpace;
-            const cardWidth = Math.floor(availableWidth / columnCount);
-            
-            const rowCount = Math.ceil(recipes.length / columnCount);
-            const cardHeight = cardWidth + 110; // Aspect ratio (1:1) + body height (110px)
-
-            const itemData: GridData = {
-              recipes,
-              columnCount,
-              cardWidth,
-              cardHeight,
-              gap: GAP,
-              resolveCover,
-              onOpenRecipe,
-              onToggleMarked
-            };
-
-            return (
-              <FixedSizeGrid
-                columnCount={columnCount}
-                columnWidth={cardWidth + GAP}
-                height={height}
-                rowCount={rowCount}
-                rowHeight={cardHeight + GAP}
-                width={width}
-                itemData={itemData}
-              >
-                {Cell}
-              </FixedSizeGrid>
-            );
-          }}
-        </AutoSizer>
+      <div className="cooking-db__grid-container" ref={containerRef}>
+        {gridSize.width > 0 && gridSize.height > 0 && (
+          <FixedSizeGrid
+            columnCount={columnCount}
+            columnWidth={cardWidth + GAP}
+            height={gridSize.height}
+            rowCount={rowCount}
+            rowHeight={cardHeight + GAP}
+            width={gridSize.width}
+            itemData={itemData}
+          >
+            {Cell}
+          </FixedSizeGrid>
+        )}
       </div>
     </div>
   );
