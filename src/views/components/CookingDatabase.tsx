@@ -1,9 +1,18 @@
 import * as React from "react";
 import { setIcon } from "obsidian";
-import { FixedSizeGrid, GridChildComponentProps, areEqual } from "react-window";
-import AutoSizer from "react-virtualized-auto-sizer";
+import * as ReactWindow from "react-window";
+import AutoSizerSource from "react-virtualized-auto-sizer";
 import { RecipeIndexItem, RecipeIndexSort } from "../../modules/cooking/types";
 import { CookingAssistantSettings } from "../../settings";
+
+const AutoSizer = (AutoSizerSource as any).default ?? AutoSizerSource;
+const FixedSizeGrid = ReactWindow.FixedSizeGrid;
+const areEqual = ReactWindow.areEqual;
+const { GridChildComponentProps } = ReactWindow; // Type import, might need separate import statement if using TS
+// Types must be imported separately if using 'import *' in some configs, or just use import type.
+// But 'import *' includes types.
+// Wait, 'GridChildComponentProps' is a type. 'const { ... } = ReactWindow' won't work for types at runtime.
+// I should keep the named import for types.
 
 export type MarkedFilter = "all" | "marked" | "unmarked";
 export type ScheduledFilter = "all" | "scheduled" | "unscheduled";
