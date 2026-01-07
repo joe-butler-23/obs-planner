@@ -276,7 +276,6 @@ const RecipeCard: React.FC<{
   const [toggleDisabled, setToggleDisabled] = React.useState(false);
 
   const handleToggle = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
     setToggleDisabled(true);
     try {
       await onToggleMarked(e.target.checked);
@@ -310,8 +309,8 @@ const RecipeCard: React.FC<{
         <div className="cooking-db__meta">
           {recipe.added ? `Added ${formatDate(recipe.added)}` : ""}
         </div>
-        <div className="cooking-db__actions">
-          <label className="cooking-db__toggle" onClick={(e) => e.stopPropagation()}>
+        <div className="cooking-db__actions" onClick={(e) => e.stopPropagation()}>
+          <label className="cooking-db__toggle">
             <input
               type="checkbox"
               checked={recipe.marked}
