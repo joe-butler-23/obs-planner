@@ -75,6 +75,7 @@ export const useKanbanBoard = <T extends BaseKanbanItem>(
 	const kanbanInstanceRef = React.useRef<any>(null);
 	const lastDragTimeRef = React.useRef(0);
 	const isDragInProgressRef = React.useRef(false);
+	const clickSuppressUntilRef = React.useRef(0);
 	const lastForceSplitRef = React.useRef<{
 		itemId: string;
 		at: number;
@@ -169,6 +170,7 @@ export const useKanbanBoard = <T extends BaseKanbanItem>(
 					dragEl: (el: HTMLElement) => {
 						if (el.classList.contains("kanban-group-header")) return;
 						isDragInProgressRef.current = true;
+						clickSuppressUntilRef.current = Date.now() + clickBlockMs;
 						el.classList.add("is-dragging");
 						console.log(
 							`[${logPrefix}] drag start`,
@@ -180,6 +182,7 @@ export const useKanbanBoard = <T extends BaseKanbanItem>(
 						el.classList.remove("is-dragging");
 						isDragInProgressRef.current = false;
 						lastDragTimeRef.current = Date.now();
+						clickSuppressUntilRef.current = Date.now() + clickBlockMs;
 						console.log(
 							`[${logPrefix}] drag end`,
 							el.dataset.eid ?? "unknown"
@@ -202,6 +205,7 @@ export const useKanbanBoard = <T extends BaseKanbanItem>(
 
 						if (itemId && targetBoardId) {
 							lastDragTimeRef.current = Date.now();
+							clickSuppressUntilRef.current = Date.now() + clickBlockMs;
 							lastInternalUpdateRef.current = Date.now();
 							Promise.resolve(onDropItem(itemId, targetBoardId)).catch(
 								(err) => {
@@ -653,6 +657,13 @@ export const useKanbanBoard = <T extends BaseKanbanItem>(
 			if (isDragInProgressRef.current) {
 				console.log(
 					`[${logPrefix}] click ignored: drag in progress`,
+					itemEl.dataset.eid ?? "unknown"
+				);
+				return;
+			}
+			if (Date.now() < clickSuppressUntilRef.current) {
+				console.log(
+					`[${logPrefix}] click ignored: drag suppress window`,
 					itemEl.dataset.eid ?? "unknown"
 				);
 				return;
