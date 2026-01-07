@@ -43,6 +43,7 @@ created: 2026-01-07
     - [x] T11.2 Documentation: Updated README with setup and architecture details.
     - [x] T11.3 Polish: Cleaned up logs and verified error states.
     - [x] T11.4 Final Sync: Pushed all changes to main branch.
+- [x] **UI Polish:** Implemented optimistic updates for checkboxes and fixed card jumping/reordering issues.
 - [x] **Regression Fix:** Re-applied and hardened Kanban drag-click suppression (increased to 500ms).
 
 ## Plan
