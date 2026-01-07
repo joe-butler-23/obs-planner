@@ -1,5 +1,0 @@
-{
-  "name": "Gemini Recipe Sorter",
-  "description": "Automatically monitors a Google Drive folder for recipe files (images, PDFs, docs), uses Gemini to extract structured data, and saves clean JSON/Markdown recipes to a destination folder.",
-  "requestFramePermissions": []
-}
