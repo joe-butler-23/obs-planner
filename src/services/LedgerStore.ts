@@ -59,9 +59,7 @@ export class LedgerStore {
   }
 
   serialize(): LedgerEntry[] {
-    return Array.from(this.entries.values()).sort((a, b) =>
-      a.processedAt.localeCompare(b.processedAt)
-    );
+    return Array.from(this.entries.values());
   }
 
   private flush() {
@@ -71,7 +69,9 @@ export class LedgerStore {
 
   private prune() {
     if (this.entries.size <= this.limit) return;
-    const sorted = this.serialize();
+    const sorted = Array.from(this.entries.values()).sort((a, b) =>
+      a.processedAt.localeCompare(b.processedAt)
+    );
     const overflow = sorted.length - this.limit;
     for (let i = 0; i < overflow; i += 1) {
       this.entries.delete(sorted[i].key);

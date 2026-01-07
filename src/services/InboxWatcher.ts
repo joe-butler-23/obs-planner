@@ -1,4 +1,4 @@
-import { App, normalizePath, TFile } from "obsidian";
+import { App, normalizePath, TFile, TFolder } from "obsidian";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { CookingAssistantSettings } from "../settings";
@@ -50,11 +50,15 @@ export class InboxWatcher {
   }
 
   async scanInbox() {
-    const folder = normalizePath(this.getSettings().inboxFolder);
-    const files = this.app.vault.getFiles().filter((f) => f.path.startsWith(`${folder}/`));
-    for (const file of files) {
-      if (this.shouldSkipFile(file)) continue;
-      await this.processFile(file);
+    const folderPath = normalizePath(this.getSettings().inboxFolder);
+    const folder = this.app.vault.getAbstractFileByPath(folderPath);
+    if (!folder || !(folder instanceof TFolder)) return;
+
+    for (const child of folder.children) {
+      if (child instanceof TFile) {
+        if (this.shouldSkipFile(child)) continue;
+        await this.processFile(child);
+      }
     }
   }
 

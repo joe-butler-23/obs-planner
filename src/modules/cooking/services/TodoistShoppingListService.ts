@@ -945,7 +945,7 @@ export class TodoistShoppingListService {
   private readonly api: TodoistApi;
 
   constructor(private app: App, private plugin: CookingAssistantPlugin) {
-    this.api = new TodoistApi(app, plugin);
+    this.api = new TodoistApi(() => plugin.settings.todoistToken);
   }
 
   async sendShoppingList(payload: { recipePaths: string[]; weekLabel: string }) {

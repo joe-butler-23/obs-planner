@@ -4,6 +4,7 @@ import type { RecipeIndexSort } from "./services/RecipeIndexService";
 
 export interface CookingAssistantSettings {
   geminiApiKey: string;
+  todoistToken: string;
   recipesFolder: string;
   inboxFolder: string;
   archiveFolder: string;
@@ -18,6 +19,7 @@ export interface CookingAssistantSettings {
 
 export const DEFAULT_SETTINGS: CookingAssistantSettings = {
   geminiApiKey: "",
+  todoistToken: "",
   recipesFolder: "recipes",
   inboxFolder: "inbox",
   archiveFolder: "inbox/archive",
@@ -98,6 +100,19 @@ export class CookingAssistantSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl("h3", { text: "Todoist" });
+
+    new Setting(containerEl)
+      .setName("Todoist API Token")
+      .setDesc("Stored locally. Required for shopping list sync.")
+      .addText((text) =>
+        text
+          .setPlaceholder("Todoist Token")
+          .setValue(this.plugin.settings.todoistToken)
+          .onChange(async (value) => {
+            this.plugin.settings.todoistToken = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
 
     new Setting(containerEl)
       .setName("Labeler mode")
