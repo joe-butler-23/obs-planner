@@ -42,7 +42,7 @@ export class CookingAssistantSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Cooking Assistant Settings" });
+    containerEl.createEl("h2", { text: "Obs Planner Settings" });
 
     new Setting(containerEl)
       .setName("Gemini API Key")
