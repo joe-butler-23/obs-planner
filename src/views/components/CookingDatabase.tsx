@@ -276,6 +276,7 @@ const RecipeCard: React.FC<{
   const [toggleDisabled, setToggleDisabled] = React.useState(false);
 
   const handleToggle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("[RecipeCard] Toggle change", { checked: e.target.checked, path: recipe.path });
     setToggleDisabled(true);
     try {
       await onToggleMarked(e.target.checked);
@@ -296,7 +297,10 @@ const RecipeCard: React.FC<{
       className="cooking-db__card"
       data-path={recipe.path}
       tabIndex={0}
-      onClick={(e) => onOpen(e.ctrlKey || e.metaKey)}
+      onClick={(e) => {
+        console.log("[RecipeCard] Card click", recipe.path);
+        onOpen(e.ctrlKey || e.metaKey);
+      }}
       onKeyDown={handleKeyDown}
     >
       <div className={`cooking-db__cover ${!coverPath ? "cooking-db__cover--empty" : ""}`}>
@@ -309,12 +313,19 @@ const RecipeCard: React.FC<{
         <div className="cooking-db__meta">
           {recipe.added ? `Added ${formatDate(recipe.added)}` : ""}
         </div>
-        <div className="cooking-db__actions" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="cooking-db__actions"
+          onClick={(e) => {
+            console.log("[RecipeCard] Actions container click - stopping propagation");
+            e.stopPropagation();
+          }}
+        >
           <label className="cooking-db__toggle">
             <input
               type="checkbox"
               checked={recipe.marked}
               onChange={handleToggle}
+              onClick={(e) => console.log("[RecipeCard] Input click")}
               disabled={toggleDisabled}
             />
             <span>Marked</span>
