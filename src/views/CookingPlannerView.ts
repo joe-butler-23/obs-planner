@@ -4,7 +4,7 @@ import { TodoistShoppingListService } from "../services/TodoistShoppingListServi
 import {
   WeeklyOrganiserShoppingListPayload,
   WeeklyOrganiserView
-} from "../../organiser/src/view";
+} from "../modules/organiser/view";
 
 export const VIEW_TYPE_COOKING_PLANNER = "cooking-planner-view";
 
