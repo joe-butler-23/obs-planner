@@ -1,0 +1,16 @@
+[Unit]
+Description=Google Drive Recipe Sync Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /home/joebutler/development/obs-sync/sync-daemon.cjs
+WorkingDirectory=/home/joebutler/development/obs-sync
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/tmp/sync-daemon-output.log
+StandardError=append:/tmp/sync-daemon-output.log
+Environment="DESTINATION_FOLDER_ID=1fFFTEAsN0biXl3O8O4R5DPmaIoq5OZ_1"
+
+[Install]
+WantedBy=default.target
