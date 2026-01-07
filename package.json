@@ -1,5 +1,5 @@
 {
-  "name": "obs-planner",
+  "name": "mise-en-place",
   "version": "0.0.1",
   "description": "Unified cooking capture and planning for Obsidian (async inbox + Weekly Organiser).",
   "main": "main.js",

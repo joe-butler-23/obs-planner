@@ -10,7 +10,7 @@ if [[ -z "${VAULT_PATH}" ]]; then
   exit 1
 fi
 
-PLUGIN_DIR="${VAULT_PATH}/.obsidian/plugins/obs-planner"
+PLUGIN_DIR="${VAULT_PATH}/.obsidian/plugins/mise-en-place"
 
 mkdir -p "${VAULT_PATH}/.obsidian/plugins"
 

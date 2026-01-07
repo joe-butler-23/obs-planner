@@ -1,4 +1,4 @@
-# Obs Planner
+# Mise en Place
 
 Unified Obsidian-first workflow for the cooking project:
 - Async inbox capture for URL, text, and image jobs (Syncthing/Git as transport)
@@ -85,5 +85,5 @@ flowchart TD
 ```bash
 VAULT_PATH=/path/to/your/vault ./scripts/obsidian-dev.sh
 ```
-2) In Obsidian, enable **Obs Planner** and run `Open Cooking Planner`, `Open Cooking Health`, or `Open Recipe Database` once.
+2) In Obsidian, enable **Mise en Place** and run `Open Cooking Planner`, `Open Cooking Health`, or `Open Recipe Database` once.
 3) When code changes land, use Obsidian's `Reload app without saving` command (or the Hot Reload community plugin) to refresh the plugin.

@@ -1,6 +1,6 @@
 {
-  "id": "obs-planner",
-  "name": "Obs Planner",
+  "id": "mise-en-place",
+  "name": "Mise en Place",
   "version": "0.0.1",
   "minAppVersion": "1.5.0",
   "description": "Unified cooking capture (async inbox) and planning (Weekly Organiser submodule) for Obsidian.",
