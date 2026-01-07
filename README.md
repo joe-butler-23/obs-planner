@@ -87,3 +87,22 @@ VAULT_PATH=/path/to/your/vault ./scripts/obsidian-dev.sh
 ```
 2) In Obsidian, enable **Mise en Place** and run `Open Cooking Planner`, `Open Cooking Health`, or `Open Recipe Database` once.
 3) When code changes land, use Obsidian's `Reload app without saving` command (or the Hot Reload community plugin) to refresh the plugin.
+
+## Partner Setup (Windows)
+For non-technical partners sharing the vault:
+
+1.  **Prerequisites:**
+    *   **Obsidian:** Install the latest installer.
+    *   **Syncthing:** Install "SyncTrayzor" (wrapper for Windows) or the base binary.
+    *   **Tailscale:** Install and login to join the mesh network.
+
+2.  **Sync Configuration:**
+    *   Connect to the Tailscale network.
+    *   Open Syncthing (SyncTrayzor).
+    *   Accept the shared folder invitation from the host machine.
+    *   Map the folder to a local path (e.g., `C:\Users\Name\Obsidian\MiseEnPlace`).
+
+3.  **Obsidian Setup:**
+    *   Open Obsidian -> "Open folder as vault" -> Select the mapped folder.
+    *   The `mise-en-place` plugin and all recipes will sync automatically.
+    *   **Note:** No manual plugin installation is required; Syncthing handles the plugin files.
