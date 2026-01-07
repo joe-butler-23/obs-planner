@@ -16,11 +16,6 @@ created: 2026-01-07
 - Git: branch-per-task, atomic commits, conventional messages (feat/fix/refactor/docs/chore).
 
 ## Active
-- [ ] T11 **Release Prep**
-    - [ ] T11.1 **Versioning:** Bump version in `manifest.json` and `package.json` to 0.1.0.
-    - [ ] T11.2 **Documentation:** Update README.md to reflect Async Inbox architecture and new Todoist settings.
-    - [ ] T11.3 **Polish:** Remove debug console logs and verify UI error states.
-    - [ ] T11.4 **Final Sync:** Perform a final git push to confirm remote parity.
 
 ## Completed
 - [x] T1 Consolidate repositories (obs-sync, organiser, helper) into unified monorepo.
@@ -43,10 +38,13 @@ created: 2026-01-07
     - [x] T10.1 Remove Sync: Deleted legacy `sync/` directory.
     - [x] T10.2 Remove Scripts: Deleted obsolete `todoist_client.py`.
     - [x] T10.3 Remove Docs: Deleted `REFACTOR-PLAN.md.md`.
+- [x] T11 **Release Prep**
+    - [x] T11.1 Versioning: Bumped version to 0.1.0 in manifest and package.
+    - [x] T11.2 Documentation: Updated README with setup and architecture details.
+    - [x] T11.3 Polish: Cleaned up logs and verified error states.
+    - [x] T11.4 Final Sync: Pushed all changes to main branch.
 - [x] **Regression Fix:** Re-applied and hardened Kanban drag-click suppression (increased to 500ms).
 
 ## Plan
-
-### T11 Release Prep
-**Goal:** Prepare the codebase for release/deployment.
-**Reasoning:** The architecture is stable and clean. We should version it and document the new "Cooking Assistant" features.
+- Future: Modularize core plugin state if complexity grows.
+- Future: Add "Study" and "Health" presets to the Planner module.
