@@ -1,7 +1,5 @@
 ![Mise en Place Banner](media/mise-en-place-banner.png)
 
-# Mise en Place
-
 Unified Obsidian-first workflow for the cooking project:
 - Async inbox capture for URL, text, and image jobs (Syncthing/Git as transport)
 - Deterministic-first extraction with Gemini fallback into standardized recipe files
