@@ -14,7 +14,7 @@ const patchJkanban = {
 };
 
 const ctx = await esbuild.context({
-  entryPoints: ["src/main.ts", "src/styles.css"],
+  entryPoints: ["src/main.ts"],
   bundle: true,
   format: "cjs",
   target: "es2020",
@@ -26,14 +26,12 @@ const ctx = await esbuild.context({
     "@codemirror/view",
     "@lezer/common"
   ],
-  outdir: "dist",
-  entryNames: "[name]",
+  outfile: "main.js",
   sourcemap: isProd ? false : "inline",
   plugins: [patchJkanban],
   loader: {
     ".ts": "ts",
-    ".tsx": "tsx",
-    ".css": "css"
+    ".tsx": "tsx"
   },
   logLevel: "info"
 });
