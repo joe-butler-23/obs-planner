@@ -69,7 +69,7 @@ flowchart TD
 - Cooking Planner view has a button to send a shopping list for the active week.
 - Uses scheduled recipes only. Gemini mode reads full recipe markdown and outputs the merged shopping list directly.
 - Preview option writes a markdown snapshot to `~/projects/sys-arc/resources/todoist-preview.md`.
-- Also creates `🍽️ - recipe title` tasks in the Bridge club project on the scheduled date (de-duped).
+- Also creates `🥕 - recipe title` tasks in the Bridge club project on the scheduled date (de-duped).
 - Labeler mode (Settings -> Todoist):
   - **Gemini only**: Gemini Flash (latest) generates the shopping list items + labels; failures abort sending and log to Health.
   - **Deterministic only**: built-in keyword rules.

@@ -507,7 +507,7 @@ const buildBridgeClubTasks = (recipes: RecipeSource[]): BridgeClubTask[] => {
 
   for (const recipe of recipes) {
     if (!recipe.scheduledDate) continue;
-    const content = `🍽️ - ${recipe.title}`;
+    const content = `🥕 - ${recipe.title}`;
     const key = `${content.toLowerCase()}|${recipe.scheduledDate}`;
     if (seen.has(key)) continue;
     seen.add(key);
