@@ -18,11 +18,12 @@ export default class CookingAssistantPlugin extends Plugin {
   settings: CookingAssistantSettings = DEFAULT_SETTINGS;
   private ledger: LedgerStore | null = null;
   inboxWatcher: InboxWatcher | null = null;
+  geminiService: GeminiService | null = null;
 
   async onload() {
     await this.loadPluginData();
 
-    const geminiService = new GeminiService(() => this.settings.geminiApiKey);
+    this.geminiService = new GeminiService(() => this.settings.geminiApiKey);
     const recipeWriter = new RecipeWriter(this.app, () => this.settings);
 
     const ledger = this.ledger;
@@ -33,7 +34,7 @@ export default class CookingAssistantPlugin extends Plugin {
     this.inboxWatcher = new InboxWatcher(
       this.app,
       () => this.settings,
-      geminiService,
+      this.geminiService,
       recipeWriter,
       ledger,
       (message) => new Notice(message)

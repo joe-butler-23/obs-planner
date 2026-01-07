@@ -25,8 +25,15 @@ const PREVIEW_LOG_PATH = path.join(
   "resources",
   "todoist-preview.md"
 );
+const SHOPPING_IGNORE_LIST = ["water", "salt", "pepper"];
 
 type RecipeSource = {
+  path: string;
+  title: string;
+  content: string;
+};
+
+type IngredientRecipeSource = {
   path: string;
   title: string;
   ingredients: string[];
@@ -36,6 +43,11 @@ type ShoppingItem = {
   content: string;
   labels: string[];
   sources: string[];
+};
+
+type GeminiShoppingItem = {
+  content: string;
+  label: string;
 };
 
 type ParsedIngredient = {
@@ -50,7 +62,6 @@ type AggregatedItem = {
   quantity: number | null;
   unit: "g" | "ml" | "count" | null;
   countUnit: string | null;
-  label: string;
   sources: Set<string>;
 };
 
@@ -252,6 +263,10 @@ const LABEL_RULES: Array<{ label: string; keywords: string[] }> = [
   }
 ];
 
+const ALLOWED_LABELS = Array.from(
+  new Set([...LABEL_RULES.map((rule) => rule.label), DEFAULT_LABEL])
+);
+
 const normalizeSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
 
 const PREP_PHRASES = [
@@ -391,6 +406,80 @@ export const parseIngredientsSection = (markdown: string): string[] => {
   }
 
   return items;
+};
+
+type GeminiShoppingContentParts = {
+  content: string;
+  ingredient: string;
+};
+
+const normalizeIgnoreValue = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+export const parseGeminiShoppingContent = (value: string): GeminiShoppingContentParts => {
+  const content = normalizeSpaces(value.trim().toLowerCase());
+  if (!content) {
+    throw new Error("Gemini shopping content is empty");
+  }
+
+  const parts = content.split(" - ");
+  if (parts.length < 2 || parts.length > 3) {
+    throw new Error("Gemini shopping content has invalid format");
+  }
+
+  const ingredient = parts[0]?.trim();
+  const recipePart = parts[parts.length - 1]?.trim();
+  const quantity = parts.length === 3 ? parts[1]?.trim() : null;
+
+  if (!ingredient) {
+    throw new Error("Gemini shopping content missing ingredient");
+  }
+  if (quantity !== null && !quantity) {
+    throw new Error("Gemini shopping content missing quantity");
+  }
+  if (!recipePart || !recipePart.startsWith("[") || !recipePart.endsWith("]")) {
+    throw new Error("Gemini shopping content missing recipe list");
+  }
+
+  return { content, ingredient };
+};
+
+export const buildShoppingItemsFromGemini = (
+  items: GeminiShoppingItem[],
+  ignoreList: string[] = SHOPPING_IGNORE_LIST
+): ShoppingItem[] => {
+  const allowedLabels = new Set(ALLOWED_LABELS);
+  const ignoreSet = new Set(ignoreList.map(normalizeIgnoreValue));
+  const seen = new Set<string>();
+  const shoppingItems: ShoppingItem[] = [];
+
+  for (const item of items) {
+    if (!item || typeof item !== "object") {
+      throw new Error("Gemini shopping item is invalid");
+    }
+    const label = String(item.label ?? "").trim().toLowerCase();
+    if (!label || !allowedLabels.has(label)) {
+      throw new Error(`Gemini shopping item has unsupported label: ${item.label}`);
+    }
+
+    const parsed = parseGeminiShoppingContent(String(item.content ?? ""));
+    if (ignoreSet.has(normalizeIgnoreValue(parsed.ingredient))) {
+      continue;
+    }
+
+    if (seen.has(parsed.content)) {
+      continue;
+    }
+    seen.add(parsed.content);
+
+    shoppingItems.push({
+      content: parsed.content,
+      labels: [label],
+      sources: []
+    });
+  }
+
+  return shoppingItems;
 };
 
 const parseNumberToken = (token: string): number | null => {
@@ -649,7 +738,7 @@ const createRecipeLabel = (titles: string[]) => {
   return `[${abbreviated.join(", ")}]`;
 };
 
-export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
+const aggregateIngredients = (recipes: IngredientRecipeSource[]): AggregatedItem[] => {
   const aggregated = new Map<string, AggregatedItem>();
 
   for (const recipe of recipes) {
@@ -673,7 +762,6 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
             quantity: null,
             unit: null,
             countUnit: null,
-            label: labelForIngredient(parsed.displayName),
             sources: new Set([recipe.title])
           });
         } else {
@@ -692,15 +780,26 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
           quantity: parsed.quantity,
           unit: parsed.unit,
           countUnit: parsed.countUnit,
-          label: labelForIngredient(parsed.displayName),
           sources: new Set([recipe.title])
         });
       }
     }
   }
 
+  return Array.from(aggregated.values());
+};
+
+const buildShoppingItemsFromAggregates = (
+  aggregated: AggregatedItem[],
+  labels: string[]
+): ShoppingItem[] => {
+  if (labels.length !== aggregated.length) {
+    throw new Error("Label count mismatch for shopping items.");
+  }
+
   const items: ShoppingItem[] = [];
-  for (const entry of aggregated.values()) {
+  for (const [index, entry] of aggregated.entries()) {
+    const label = labels[index] ?? DEFAULT_LABEL;
     const recipeList = Array.from(entry.sources);
     const recipeLabel = createRecipeLabel(recipeList);
 
@@ -708,7 +807,7 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
       const content = recipeLabel ? `${entry.displayName} - ${recipeLabel}` : entry.displayName;
       items.push({
         content,
-        labels: [entry.label],
+        labels: [label],
         sources: Array.from(entry.sources)
       });
       continue;
@@ -728,12 +827,18 @@ export const buildShoppingItems = (recipes: RecipeSource[]): ShoppingItem[] => {
     const content = recipeLabel ? `${baseContent} - ${recipeLabel}` : baseContent;
     items.push({
       content,
-      labels: [entry.label],
+      labels: [label],
       sources: Array.from(entry.sources)
     });
   }
 
   return items;
+};
+
+export const buildShoppingItems = (recipes: IngredientRecipeSource[]): ShoppingItem[] => {
+  const aggregated = aggregateIngredients(recipes);
+  const labels = aggregated.map((entry) => labelForIngredient(entry.displayName));
+  return buildShoppingItemsFromAggregates(aggregated, labels);
 };
 
 class TodoistConfirmModal extends ModalBase {
@@ -808,15 +913,68 @@ export class TodoistShoppingListService {
     }
 
     const recipes = await this.loadRecipes(payload.recipePaths);
-    const items = buildShoppingItems(recipes);
-    if (items.length === 0) {
-      new Notice("No ingredients found in scheduled recipes.");
+    if (recipes.length === 0) {
+      new Notice("No scheduled recipes found for this week.");
       this.plugin.recordLedgerEntry(
         "skipped",
         ledgerKey,
-        `todoist: no ingredients found for ${payload.weekLabel}`
+        `todoist: no scheduled recipes for ${payload.weekLabel}`
       );
       return;
+    }
+
+    let items: ShoppingItem[] = [];
+    if (this.plugin.settings.todoistLabelerMode === "gemini") {
+      try {
+        items = await this.buildShoppingItemsWithGemini(recipes);
+      } catch (error) {
+        new Notice("Gemini shopping list failed. Check Gemini key and logs.");
+        this.plugin.recordLedgerEntry(
+          "error",
+          ledgerKey,
+          `todoist: gemini list failed (${this.formatError(error)})`
+        );
+        console.error("Gemini shopping list failed", error);
+        return;
+      }
+      if (items.length === 0) {
+        new Notice("Gemini returned no shopping list items.");
+        this.plugin.recordLedgerEntry(
+          "skipped",
+          ledgerKey,
+          `todoist: gemini returned no items for ${payload.weekLabel}`
+        );
+        return;
+      }
+    } else {
+      const ingredientRecipes: IngredientRecipeSource[] = recipes.map((recipe) => ({
+        path: recipe.path,
+        title: recipe.title,
+        ingredients: parseIngredientsSection(recipe.content)
+      }));
+      const aggregated = aggregateIngredients(ingredientRecipes);
+      if (aggregated.length === 0) {
+        new Notice("No ingredients found in scheduled recipes.");
+        this.plugin.recordLedgerEntry(
+          "skipped",
+          ledgerKey,
+          `todoist: no ingredients found for ${payload.weekLabel}`
+        );
+        return;
+      }
+      const labels = aggregated.map((entry) => labelForIngredient(entry.displayName));
+      try {
+        items = buildShoppingItemsFromAggregates(aggregated, labels);
+      } catch (error) {
+        new Notice("Shopping list labelling failed. Check logs.");
+        this.plugin.recordLedgerEntry(
+          "error",
+          ledgerKey,
+          `todoist: labeler mismatch (${this.formatError(error)})`
+        );
+        console.error("Shopping list labelling failed", error);
+        return;
+      }
     }
 
     let baselineCount = 0;
@@ -891,6 +1049,26 @@ export class TodoistShoppingListService {
     );
   }
 
+  private async buildShoppingItemsWithGemini(
+    recipes: RecipeSource[]
+  ): Promise<ShoppingItem[]> {
+    const gemini = this.plugin.geminiService;
+    if (!gemini) {
+      throw new Error("Gemini service unavailable");
+    }
+    const items = await gemini.buildShoppingList({
+      recipes: recipes.map((recipe) => ({
+        title: recipe.title,
+        content: recipe.content
+      })),
+      ignoreList: SHOPPING_IGNORE_LIST,
+      allowedLabels: ALLOWED_LABELS,
+      defaultLabel: DEFAULT_LABEL,
+      stopWords: Array.from(STOP_WORDS)
+    });
+    return buildShoppingItemsFromGemini(items, SHOPPING_IGNORE_LIST);
+  }
+
   private async loadRecipes(paths: string[]): Promise<RecipeSource[]> {
     const recipes: RecipeSource[] = [];
     for (const recipePath of paths) {
@@ -903,7 +1081,7 @@ export class TodoistShoppingListService {
       recipes.push({
         path: recipePath,
         title,
-        ingredients: parseIngredientsSection(content)
+        content
       });
     }
     return recipes;

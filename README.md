@@ -17,7 +17,7 @@ flowchart TD
   D -->|URL| E[Fetch HTML + JSON-LD/WPRM]
   E --> F{Structured recipe?}
   F -->|Yes| G[Recipe object]
-  F -->|No| H[Gemini 3 Flash (strict JSON)]
+  F -->|No| H[Gemini Flash (latest, strict JSON)]
   D -->|Text| H
   D -->|Image| H
   H --> I[Filter against source text]
@@ -64,6 +64,14 @@ flowchart TD
 - Marked checkbox updates recipe frontmatter (`marked: true/false`).
 - Search bar + tag filter are in the view header.
 - Settings: sort order, marked/scheduled filters, card minimum width, max cards.
+
+## Todoist shopping list
+- Cooking Planner view has a button to send a shopping list for the active week.
+- Uses scheduled recipes only. Gemini mode reads full recipe markdown and outputs the merged shopping list directly.
+- Preview option writes a markdown snapshot to `~/projects/sys-arc/resources/todoist-preview.md`.
+- Labeler mode (Settings -> Todoist):
+  - **Gemini only**: Gemini Flash (latest) generates the shopping list items + labels; failures abort sending and log to Health.
+  - **Deterministic only**: built-in keyword rules.
 
 ## Performance notes
 - Cached recipe index keyed by file fingerprint (mtime + size).

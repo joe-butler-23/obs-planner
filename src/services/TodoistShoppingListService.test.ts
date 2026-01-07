@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildShoppingItemsFromGemini,
   buildShoppingItems,
   labelForIngredient,
+  parseGeminiShoppingContent,
   parseIngredientsSection
 } from "./TodoistShoppingListService";
 
@@ -20,6 +22,40 @@ describe("TodoistShoppingListService helpers", () => {
     ].join("\n");
     const items = parseIngredientsSection(markdown);
     expect(items).toEqual(["1 onion", "2 onions", "salt"]);
+  });
+
+  it("parses gemini shopping content with quantity", () => {
+    const parsed = parseGeminiShoppingContent("carrots - 250g - [carrot beansotto]");
+    expect(parsed).toEqual({
+      content: "carrots - 250g - [carrot beansotto]",
+      ingredient: "carrots"
+    });
+  });
+
+  it("parses gemini shopping content without quantity", () => {
+    const parsed = parseGeminiShoppingContent("bay leaf - [beanotto]");
+    expect(parsed).toEqual({
+      content: "bay leaf - [beanotto]",
+      ingredient: "bay leaf"
+    });
+  });
+
+  it("filters ignored items from gemini output", () => {
+    const items = buildShoppingItemsFromGemini(
+      [
+        { content: "salt - [recipe a]", label: "tinned-jarred-dried" },
+        { content: "carrots - 250g - [recipe a]", label: "fruit-and-veg" }
+      ],
+      ["salt", "water", "pepper"]
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].content).toBe("carrots - 250g - [recipe a]");
+  });
+
+  it("rejects unsupported gemini labels", () => {
+    expect(() =>
+      buildShoppingItemsFromGemini([{ content: "carrots - 250g - [recipe a]", label: "unknown" }])
+    ).toThrow("unsupported label");
   });
 
   it("merges count-based ingredients and keeps no-quantity items", () => {

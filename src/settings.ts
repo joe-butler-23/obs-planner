@@ -8,6 +8,7 @@ export interface CookingAssistantSettings {
   inboxFolder: string;
   archiveFolder: string;
   imagesFolder: string;
+  todoistLabelerMode: "gemini" | "deterministic";
   databaseSort: RecipeIndexSort;
   databaseMarkedFilter: "all" | "marked" | "unmarked";
   databaseScheduledFilter: "all" | "scheduled" | "unscheduled";
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS: CookingAssistantSettings = {
   inboxFolder: "inbox",
   archiveFolder: "inbox/archive",
   imagesFolder: "recipes/images",
+  todoistLabelerMode: "gemini",
   databaseSort: "added-desc",
   databaseMarkedFilter: "all",
   databaseScheduledFilter: "all",
@@ -94,6 +96,24 @@ export class CookingAssistantSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    containerEl.createEl("h3", { text: "Todoist" });
+
+    new Setting(containerEl)
+      .setName("Labeler mode")
+      .setDesc("Gemini builds the full shopping list using gemini-flash-latest. Deterministic uses built-in rules.")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOptions({
+            gemini: "Gemini only",
+            deterministic: "Deterministic only"
+          })
+          .setValue(this.plugin.settings.todoistLabelerMode)
+          .onChange(async (value) => {
+            this.plugin.settings.todoistLabelerMode = value as "gemini" | "deterministic";
+            await this.plugin.saveSettings();
+          });
+      });
 
     containerEl.createEl("h3", { text: "Recipe Database" });
 
