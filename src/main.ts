@@ -4,7 +4,7 @@ import { CookingAssistantSettingTab, CookingAssistantSettings, DEFAULT_SETTINGS 
 import { GeminiService } from "./services/GeminiService";
 import { InboxWatcher } from "./services/InboxWatcher";
 import { LedgerEntry, LedgerStatus, LedgerStore } from "./services/LedgerStore";
-import { RecipeWriter } from "./services/RecipeWriter";
+import { RecipeWriter } from "./modules/cooking/services/RecipeWriter";
 import { CookingDatabaseView, VIEW_TYPE_RECIPE_DATABASE } from "./views/CookingDatabaseView";
 import { CookingHealthView, VIEW_TYPE_COOKING_HEALTH } from "./views/CookingHealthView";
 import { CookingPlannerView, VIEW_TYPE_COOKING_PLANNER } from "./views/CookingPlannerView";

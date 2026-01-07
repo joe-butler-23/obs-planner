@@ -1,6 +1,6 @@
 import { WorkspaceLeaf } from "obsidian";
 import CookingAssistantPlugin from "../main";
-import { TodoistShoppingListService } from "../services/TodoistShoppingListService";
+import { TodoistShoppingListService } from "../modules/cooking/services/TodoistShoppingListService";
 import {
   WeeklyOrganiserShoppingListPayload,
   WeeklyOrganiserView

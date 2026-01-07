@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import CookingAssistantPlugin from "../main";
+import CookingAssistantPlugin from "../../../main";
 
 const execFileAsync = promisify(execFile);
 const ModalBase = (Modal ?? class {}) as typeof Modal;

@@ -65,7 +65,7 @@ export const useKanbanBoard = <T extends BaseKanbanItem>(
 		onDropItem,
 		onCardClick,
 		refreshDelayMs = 50,
-		clickBlockMs = 250,
+		clickBlockMs = 500,
 		internalUpdateDelayMs = 250,
 		logPrefix = "KanbanBoard",
 		logItemErrors = false,
@@ -182,6 +182,8 @@ export const useKanbanBoard = <T extends BaseKanbanItem>(
 						el.classList.remove("is-dragging");
 						isDragInProgressRef.current = false;
 						lastDragTimeRef.current = Date.now();
+						// REGRESSION FIX: Set suppression window to prevent click-open after drag/drop.
+						// Do not remove this or reduce clickBlockMs without verifying drag behavior.
 						clickSuppressUntilRef.current = Date.now() + clickBlockMs;
 						console.log(
 							`[${logPrefix}] drag end`,

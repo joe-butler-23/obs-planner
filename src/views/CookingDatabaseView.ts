@@ -1,6 +1,6 @@
 import { ItemView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import CookingAssistantPlugin from "../main";
-import { RecipeIndexService, RecipeIndexSort } from "../services/RecipeIndexService";
+import { RecipeIndexService, RecipeIndexSort } from "../modules/cooking/services/RecipeIndexService";
 
 export const VIEW_TYPE_RECIPE_DATABASE = "cooking-database-view";
 

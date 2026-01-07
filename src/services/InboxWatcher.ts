@@ -4,7 +4,7 @@ import { z } from "zod";
 import { CookingAssistantSettings } from "../settings";
 import { GeminiService } from "./GeminiService";
 import { LedgerStore } from "./LedgerStore";
-import { DuplicateRecipeError, RecipeWriter } from "./RecipeWriter";
+import { DuplicateRecipeError, RecipeWriter } from "../modules/cooking/services/RecipeWriter";
 
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp"]);
 const SUPPORTED_TEXT_EXTENSIONS = new Set(["txt", "md"]);

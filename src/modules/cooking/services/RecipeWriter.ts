@@ -1,7 +1,7 @@
 import { App, normalizePath } from "obsidian";
-import { CookingAssistantSettings } from "../settings";
-import { ProcessedRecipe } from "../types";
-import { InboxJob } from "./InboxWatcher";
+import { CookingAssistantSettings } from "../../../settings";
+import { ProcessedRecipe } from "../../../types";
+import { InboxJob } from "../../../services/InboxWatcher";
 
 export class DuplicateRecipeError extends Error {
   constructor(public readonly slug: string) {
