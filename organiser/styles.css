@@ -414,7 +414,7 @@
 	position: relative;
 	box-sizing: border-box;
 	display: grid !important;
-	grid-template-columns: 240px repeat(4, 300px);
+	grid-template-columns: repeat(5, 240px);
 	grid-template-rows: repeat(2, 400px);
 	gap: 12px;
 	padding-bottom: 40px;
