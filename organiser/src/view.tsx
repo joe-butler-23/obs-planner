@@ -1,15 +1,33 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
-import { WeeklyOrganiserBoard } from "./components/WeeklyOrganiserBoard";
+import {
+	WeeklyOrganiserBoard,
+	WeeklyOrganiserShoppingListPayload,
+} from "./components/WeeklyOrganiserBoard";
 
 export const VIEW_TYPE_WEEKLY_ORGANISER = "weekly-organiser-view";
 
 export class WeeklyOrganiserView extends ItemView {
 	root: Root | null = null;
+	private onSendShoppingList?: (
+		payload: WeeklyOrganiserShoppingListPayload
+	) => void;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		onSendShoppingList?: (
+			payload: WeeklyOrganiserShoppingListPayload
+		) => void
+	) {
 		super(leaf);
+		this.onSendShoppingList = onSendShoppingList;
+	}
+
+	setOnSendShoppingList(
+		handler?: (payload: WeeklyOrganiserShoppingListPayload) => void
+	) {
+		this.onSendShoppingList = handler;
 	}
 
 	getViewType() {
@@ -31,7 +49,10 @@ export class WeeklyOrganiserView extends ItemView {
 		this.root.render(
 			<React.StrictMode>
 				<div className="weekly-organiser-view-container">
-					<WeeklyOrganiserBoard app={this.app} />
+					<WeeklyOrganiserBoard
+						app={this.app}
+						onSendShoppingList={this.onSendShoppingList}
+					/>
 				</div>
 			</React.StrictMode>
 		);
@@ -42,3 +63,5 @@ export class WeeklyOrganiserView extends ItemView {
 		this.root?.unmount();
 	}
 }
+
+export type { WeeklyOrganiserShoppingListPayload };

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { App, TFile, WorkspaceLeaf, moment } from "obsidian";
+import { App, Notice, TFile, WorkspaceLeaf, moment } from "obsidian";
 import { createWeeklyOrganiserConfig } from "../boards/weeklyOrganiserConfig";
 import { renderWeeklyOrganiserCard } from "../boards/weeklyOrganiserCard";
 import { useKanbanBoard } from "../hooks/useKanbanBoard";
@@ -10,6 +10,7 @@ import {
 	OrganiserPresetId,
 } from "../presets/organiserPresets";
 import { OrganiserItem } from "../types";
+import { buildBoardEntries } from "../kanban/buildBoardsData";
 import { FieldManager } from "../utils/field-manager";
 
 // Type cast for moment (Obsidian re-exports it)
@@ -17,12 +18,22 @@ const momentFn: any = moment;
 
 interface WeeklyOrganiserBoardProps {
 	app: App;
+	onSendShoppingList?: (payload: WeeklyOrganiserShoppingListPayload) => void;
 }
+
+export type WeeklyOrganiserShoppingListPayload = {
+	recipePaths: string[];
+	weekLabel: string;
+	weekOffset: number;
+};
 
 /**
  * Weekly Organiser Board - jKanban implementation
  */
-export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
+export const WeeklyOrganiserBoard = ({
+	app,
+	onSendShoppingList,
+}: WeeklyOrganiserBoardProps) => {
 	const [activePresetId, setActivePresetId] =
 		React.useState<OrganiserPresetId>(ORGANISER_PRESETS[0].id);
 	const [searchQuery, setSearchQuery] = React.useState("");
@@ -238,6 +249,52 @@ export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
 		groupOrder,
 	});
 
+	React.useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const stopIfToggle = (event: Event) => {
+			const target = event.target as HTMLElement | null;
+			if (!target) return;
+			if (!target.closest(".organiser-card__marked-toggle")) return;
+			event.stopPropagation();
+		};
+
+		const handleChange = async (event: Event) => {
+			const target = event.target as HTMLInputElement | null;
+			if (!target?.classList.contains("organiser-card__marked-input")) return;
+			event.stopPropagation();
+			const itemId = target.dataset.itemId;
+			if (!itemId) return;
+
+			const file = app.vault.getAbstractFileByPath(itemId);
+			if (!(file instanceof TFile)) return;
+
+			target.disabled = true;
+			try {
+				await app.fileManager.processFrontMatter(file, (frontmatter) => {
+					if (target.checked) {
+						frontmatter.marked = true;
+					} else {
+						delete frontmatter.marked;
+					}
+				});
+			} finally {
+				target.disabled = false;
+			}
+		};
+
+		container.addEventListener("mousedown", stopIfToggle, true);
+		container.addEventListener("click", stopIfToggle, true);
+		container.addEventListener("change", handleChange);
+
+		return () => {
+			container.removeEventListener("mousedown", stopIfToggle, true);
+			container.removeEventListener("click", stopIfToggle, true);
+			container.removeEventListener("change", handleChange);
+		};
+	}, [app, containerRef]);
+
 	// Week navigation
 	const startDate = momentFn()
 		.add(weekOffset, "weeks")
@@ -245,6 +302,26 @@ export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
 	const endDate = startDate.clone().add(6, "days");
 	const weekRangeDisplay = `${startDate.format("MMM Do")} - ${endDate.format("MMM Do, YYYY")}`;
 	const startDateValue = startDate.format("YYYY-MM-DD");
+
+	const handleSendShoppingList = React.useCallback(() => {
+		if (!onSendShoppingList) return;
+		const { entriesByFile } = buildBoardEntries(app, config, {
+			logPrefix: "WeeklyOrganiser",
+			logItemErrors: false,
+		});
+		const recipePaths = Array.from(entriesByFile.values())
+			.filter((entry) => entry.item.type === "recipe" && entry.item.date)
+			.map((entry) => entry.filePath);
+		if (recipePaths.length === 0) {
+			new Notice("No scheduled recipes found for this week.");
+			return;
+		}
+		onSendShoppingList({
+			recipePaths,
+			weekLabel: weekRangeDisplay,
+			weekOffset,
+		});
+	}, [app, config, onSendShoppingList, weekOffset, weekRangeDisplay]);
 
 	const handleCalendarSelect = React.useCallback((date: Date) => {
 		if (!date) return;
@@ -449,6 +526,23 @@ export const WeeklyOrganiserBoard = ({ app }: WeeklyOrganiserBoardProps) => {
 				)}
 
 				<div className="topbar-actions">
+					{onSendShoppingList && (
+						<div className="topbar-action">
+							<button
+								className="topbar-icon-btn"
+								type="button"
+								title="Send shopping list to Todoist"
+								aria-label="Send shopping list to Todoist"
+								onClick={handleSendShoppingList}
+							>
+								<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+									<circle cx="9" cy="21" r="1" />
+									<circle cx="20" cy="21" r="1" />
+									<path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+								</svg>
+							</button>
+						</div>
+					)}
 					<div className="topbar-action">
 						<button
 							ref={filterButtonRef}
