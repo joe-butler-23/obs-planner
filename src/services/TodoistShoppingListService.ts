@@ -1,4 +1,4 @@
-import { App, Modal, Notice, TFile } from "obsidian";
+import { App, Modal, Notice, TFile, moment } from "obsidian";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -11,6 +11,7 @@ const ModalBase = (Modal ?? class {}) as typeof Modal;
 
 const SHOPPING_PROJECT_ID = "2353762598";
 const DEFAULT_LABEL = "tinned-jarred-dried";
+const BRIDGE_CLUB_PROJECT_MATCH = "bridge club";
 const SESSION_LOG_PATH = path.join(
   os.homedir(),
   "projects",
@@ -31,6 +32,7 @@ type RecipeSource = {
   path: string;
   title: string;
   content: string;
+  scheduledDate: string | null;
 };
 
 type IngredientRecipeSource = {
@@ -48,6 +50,11 @@ type ShoppingItem = {
 type GeminiShoppingItem = {
   content: string;
   label: string;
+};
+
+type BridgeClubTask = {
+  content: string;
+  dueDate: string;
 };
 
 type ParsedIngredient = {
@@ -68,6 +75,8 @@ type AggregatedItem = {
 type TodoistTaskPayload = {
   content: string;
   labels?: string[];
+  due_date?: string;
+  section_id?: string;
 };
 
 type ConfirmSummary = {
@@ -75,6 +84,8 @@ type ConfirmSummary = {
   recipeCount: number;
   itemCount: number;
   baselineCount: number;
+  bridgeClubCount: number;
+  bridgeClubPlanned: number;
 };
 
 type TodoistAction = "send" | "preview" | "cancel";
@@ -268,6 +279,14 @@ const ALLOWED_LABELS = Array.from(
 );
 
 const normalizeSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
+const normalizeScheduledDate = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = moment(trimmed);
+  if (!parsed.isValid()) return null;
+  return parsed.format("YYYY-MM-DD");
+};
 
 const PREP_PHRASES = [
   "good-quality",
@@ -480,6 +499,33 @@ export const buildShoppingItemsFromGemini = (
   }
 
   return shoppingItems;
+};
+
+const buildBridgeClubTasks = (recipes: RecipeSource[]): BridgeClubTask[] => {
+  const tasks: BridgeClubTask[] = [];
+  const seen = new Set<string>();
+
+  for (const recipe of recipes) {
+    if (!recipe.scheduledDate) continue;
+    const content = `🍽️ - ${recipe.title}`;
+    const key = `${content.toLowerCase()}|${recipe.scheduledDate}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tasks.push({
+      content,
+      dueDate: recipe.scheduledDate
+    });
+  }
+
+  return tasks;
+};
+
+const getTaskDueDate = (task: { due?: { date?: string | null; datetime?: string | null } }) => {
+  const due = task.due;
+  if (!due) return null;
+  if (due.date) return due.date;
+  if (due.datetime) return due.datetime.slice(0, 10);
+  return null;
 };
 
 const parseNumberToken = (token: string): number | null => {
@@ -866,6 +912,9 @@ class TodoistConfirmModal extends ModalBase {
     summary.createEl("p", {
       text: `Current Todoist items: ${this.summary.baselineCount}`
     });
+    summary.createEl("p", {
+      text: `Bridge club items: ${this.summary.bridgeClubCount}, New meals: ${this.summary.bridgeClubPlanned}`
+    });
 
     const actions = contentEl.createEl("div", { cls: "modal-button-container" });
     const cancel = actions.createEl("button", { text: "Cancel" });
@@ -977,6 +1026,41 @@ export class TodoistShoppingListService {
       }
     }
 
+    let bridgeClubProjectId: string | null = null;
+    let bridgeClubProjectName = "Bridge club";
+    let bridgeClubBaseline = 0;
+    let bridgeClubTasks: BridgeClubTask[] = [];
+    try {
+      const bridgeProject = await this.resolveBridgeClubProject();
+      bridgeClubProjectId = bridgeProject.id;
+      bridgeClubProjectName = bridgeProject.name;
+      const existingBridgeTasks = await this.listTodoistTasks(bridgeClubProjectId);
+      bridgeClubBaseline = existingBridgeTasks.length;
+      const desiredBridgeTasks = buildBridgeClubTasks(recipes);
+      const existingKeys = new Set(
+        existingBridgeTasks
+          .map((task) => {
+            const dueDate = getTaskDueDate(task);
+            if (!dueDate || !task.content) return null;
+            return `${task.content.toLowerCase()}|${dueDate}`;
+          })
+          .filter(Boolean) as string[]
+      );
+      bridgeClubTasks = desiredBridgeTasks.filter((task) => {
+        const key = `${task.content.toLowerCase()}|${task.dueDate}`;
+        return !existingKeys.has(key);
+      });
+    } catch (error) {
+      new Notice("Bridge club sync failed. Check Todoist token and logs.");
+      this.plugin.recordLedgerEntry(
+        "error",
+        ledgerKey,
+        `todoist: bridge club failed (${this.formatError(error)})`
+      );
+      console.error("Bridge club sync failed", error);
+      return;
+    }
+
     let baselineCount = 0;
     try {
       const current = await this.listTodoistTasks();
@@ -996,10 +1080,12 @@ export class TodoistShoppingListService {
       weekLabel: payload.weekLabel,
       recipeCount: recipes.length,
       itemCount: items.length,
-      baselineCount
+      baselineCount,
+      bridgeClubCount: bridgeClubBaseline,
+      bridgeClubPlanned: bridgeClubTasks.length
     });
     if (action === "preview") {
-      await this.writePreview(items, payload.weekLabel);
+      await this.writePreview(items, payload.weekLabel, bridgeClubTasks, bridgeClubProjectName);
       this.plugin.recordLedgerEntry(
         "skipped",
         ledgerKey,
@@ -1015,6 +1101,25 @@ export class TodoistShoppingListService {
         `todoist: cancelled for ${payload.weekLabel}`
       );
       return;
+    }
+
+    let bridgeClubCreated: Array<{ id: string; content: string; due?: { date?: string } }> = [];
+    if (bridgeClubProjectId && bridgeClubTasks.length > 0) {
+      try {
+        bridgeClubCreated = await this.createBridgeClubTasks(
+          bridgeClubTasks,
+          bridgeClubProjectId
+        );
+      } catch (error) {
+        new Notice("Bridge club create failed. Check token and logs.");
+        this.plugin.recordLedgerEntry(
+          "error",
+          ledgerKey,
+          `todoist: bridge club create failed (${this.formatError(error)})`
+        );
+        console.error("Bridge club create failed", error);
+        return;
+      }
     }
 
     let created: Array<{ id: string; content: string; labels: string[] }> = [];
@@ -1035,17 +1140,26 @@ export class TodoistShoppingListService {
       await this.logSession({
         weekLabel: payload.weekLabel,
         recipes,
-        tasks: created
+        tasks: created,
+        bridgeClub: bridgeClubProjectId
+          ? {
+              projectId: bridgeClubProjectId,
+              projectName: bridgeClubProjectName,
+              tasks: bridgeClubCreated
+            }
+          : undefined
       });
     } catch (error) {
       console.error("Todoist session log failed", error);
     }
 
-    new Notice(`Sent ${created.length} items to Todoist.`);
+    const mealCount = bridgeClubCreated.length;
+    const mealSuffix = mealCount ? `, ${mealCount} meals to ${bridgeClubProjectName}` : "";
+    new Notice(`Sent ${created.length} items to Todoist${mealSuffix}.`);
     this.plugin.recordLedgerEntry(
       "success",
       ledgerKey,
-      `todoist: sent ${created.length} items for ${payload.weekLabel}`
+      `todoist: sent ${created.length} items, ${mealCount} meals for ${payload.weekLabel}`
     );
   }
 
@@ -1076,12 +1190,16 @@ export class TodoistShoppingListService {
       if (!(file instanceof TFile)) continue;
       const content = await this.app.vault.read(file);
       const cache = this.app.metadataCache.getFileCache(file);
-      const title =
-        (cache?.frontmatter?.title as string) || file.basename || recipePath;
+      const frontmatter = cache?.frontmatter ?? {};
+      const title = (frontmatter?.title as string) || file.basename || recipePath;
+      const scheduledDate = normalizeScheduledDate(
+        frontmatter.scheduled ?? frontmatter.date
+      );
       recipes.push({
         path: recipePath,
         title,
-        content
+        content,
+        scheduledDate
       });
     }
     return recipes;
@@ -1118,13 +1236,25 @@ export class TodoistShoppingListService {
     return stdout;
   }
 
-  private async listTodoistTasks(): Promise<Array<{ id: string }>> {
-    const output = await this.runTodoistCommand([
-      "list",
-      "--project",
-      SHOPPING_PROJECT_ID
-    ]);
+  private async listTodoistTasks(projectId: string = SHOPPING_PROJECT_ID): Promise<any[]> {
+    const output = await this.runTodoistCommand(["list", "--project", projectId]);
     return JSON.parse(output);
+  }
+
+  private async listTodoistProjects(): Promise<Array<{ id: string; name: string }>> {
+    const output = await this.runTodoistCommand(["projects"]);
+    return JSON.parse(output);
+  }
+
+  private async resolveBridgeClubProject(): Promise<{ id: string; name: string }> {
+    const projects = await this.listTodoistProjects();
+    const match = projects.find((project) =>
+      project.name.toLowerCase().includes(BRIDGE_CLUB_PROJECT_MATCH)
+    );
+    if (!match) {
+      throw new Error("Bridge club project not found");
+    }
+    return { id: match.id, name: match.name };
   }
 
   private async createTodoistTasks(items: ShoppingItem[]) {
@@ -1150,7 +1280,36 @@ export class TodoistShoppingListService {
     }
   }
 
-  private async writePreview(items: ShoppingItem[], weekLabel: string) {
+  private async createBridgeClubTasks(tasks: BridgeClubTask[], projectId: string) {
+    if (tasks.length === 0) return [];
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "todoist-"));
+    const payloadPath = path.join(tmpDir, "tasks.json");
+    const payload: TodoistTaskPayload[] = tasks.map((task) => ({
+      content: task.content,
+      due_date: task.dueDate
+    }));
+    await fs.writeFile(payloadPath, JSON.stringify(payload, null, 2), "utf8");
+
+    try {
+      const output = await this.runTodoistCommand([
+        "create-batch",
+        "--project",
+        projectId,
+        "--file",
+        payloadPath
+      ]);
+      return JSON.parse(output);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  }
+
+  private async writePreview(
+    items: ShoppingItem[],
+    weekLabel: string,
+    bridgeClubTasks: BridgeClubTask[],
+    bridgeClubProjectName: string
+  ) {
     const lines = [
       "# todoist preview",
       "",
@@ -1160,6 +1319,13 @@ export class TodoistShoppingListService {
       "## items",
       ...items.map((item) => `- ${item.content}`)
     ];
+    if (bridgeClubTasks.length > 0) {
+      lines.push("");
+      lines.push(`## ${bridgeClubProjectName}`);
+      lines.push(
+        ...bridgeClubTasks.map((task) => `- ${task.content} (due ${task.dueDate})`)
+      );
+    }
     await fs.writeFile(PREVIEW_LOG_PATH, lines.join("\n"), "utf8");
   }
 
@@ -1167,6 +1333,11 @@ export class TodoistShoppingListService {
     weekLabel: string;
     recipes: RecipeSource[];
     tasks: Array<{ id: string; content: string; labels?: string[] }>;
+    bridgeClub?: {
+      projectId: string;
+      projectName: string;
+      tasks: Array<{ id: string; content: string; due?: { date?: string | null } }>;
+    };
   }) {
     const entry = {
       timestamp: new Date().toISOString(),
@@ -1181,7 +1352,19 @@ export class TodoistShoppingListService {
         content: task.content,
         labels: task.labels ?? []
       })),
-      count: payload.tasks.length
+      count: payload.tasks.length,
+      bridgeClub: payload.bridgeClub
+        ? {
+            projectId: payload.bridgeClub.projectId,
+            projectName: payload.bridgeClub.projectName,
+            tasks: payload.bridgeClub.tasks.map((task) => ({
+              id: task.id,
+              content: task.content,
+              dueDate: task.due?.date ?? null
+            })),
+            count: payload.bridgeClub.tasks.length
+          }
+        : null
     };
 
     let history: unknown = [];

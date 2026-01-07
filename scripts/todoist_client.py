@@ -35,12 +35,38 @@ class TodoistClient:
         resp.raise_for_status()
         return resp.json()
 
-    def create_task(self, content, project_id, labels=None, description=None):
+    def list_projects(self):
+        resp = requests.get(f"{self.api_url}/projects", headers=self.headers)
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_sections(self, project_id):
+        resp = requests.get(
+            f"{self.api_url}/sections",
+            headers=self.headers,
+            params={"project_id": project_id},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def create_task(
+        self,
+        content,
+        project_id,
+        labels=None,
+        description=None,
+        due_date=None,
+        section_id=None,
+    ):
         data = {"content": content, "project_id": project_id}
         if labels:
             data["labels"] = labels
         if description:
             data["description"] = description
+        if due_date:
+            data["due_date"] = due_date
+        if section_id:
+            data["section_id"] = section_id
 
         resp = requests.post(f"{self.api_url}/tasks", headers=self.headers, json=data)
         resp.raise_for_status()
@@ -82,13 +108,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Deterministic Todoist CLI")
     parser.add_argument(
         "command",
-        choices=["list", "create", "create-batch", "delete", "complete", "update"],
+        choices=[
+            "list",
+            "projects",
+            "sections",
+            "create",
+            "create-batch",
+            "delete",
+            "complete",
+            "update",
+        ],
     )
     parser.add_argument("--project", help="Project ID")
     parser.add_argument("--content", help="Task content")
     parser.add_argument("--id", help="Task ID")
     parser.add_argument("--labels", help="Comma-separated labels")
     parser.add_argument("--description", help="Task description")
+    parser.add_argument("--due", help="Due date (YYYY-MM-DD)")
+    parser.add_argument("--section", help="Section ID")
     parser.add_argument("--file", help="JSON file with tasks for batch create")
 
     args = parser.parse_args()
@@ -96,9 +133,27 @@ if __name__ == "__main__":
 
     if args.command == "list":
         print(json.dumps(client.list_tasks(args.project), indent=2))
+    elif args.command == "projects":
+        print(json.dumps(client.list_projects(), indent=2))
+    elif args.command == "sections":
+        if not args.project:
+            raise SystemExit("sections requires --project")
+        print(json.dumps(client.list_sections(args.project), indent=2))
     elif args.command == "create":
         labels = args.labels.split(",") if args.labels else None
-        print(json.dumps(client.create_task(args.content, args.project, labels), indent=2))
+        print(
+            json.dumps(
+                client.create_task(
+                    args.content,
+                    args.project,
+                    labels,
+                    args.description,
+                    args.due,
+                    args.section,
+                ),
+                indent=2,
+            )
+        )
     elif args.command == "create-batch":
         if not args.project:
             raise SystemExit("create-batch requires --project")
@@ -113,6 +168,8 @@ if __name__ == "__main__":
                     args.project,
                     task.get("labels"),
                     task.get("description"),
+                    task.get("due_date"),
+                    task.get("section_id"),
                 )
             )
         print(json.dumps(created, indent=2))
