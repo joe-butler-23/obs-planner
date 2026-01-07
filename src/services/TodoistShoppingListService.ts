@@ -1096,8 +1096,18 @@ export class TodoistShoppingListService {
 
   private getTodoistScriptPath(): string {
     const vaultPath = this.app.vault.adapter.getBasePath();
+    const configDir = this.app.vault.configDir || ".obsidian";
     const pluginId = this.plugin.manifest.id;
-    return path.join(vaultPath, ".obsidian", "plugins", pluginId, "scripts", "todoist_client.py");
+    const normalized = path.normalize(vaultPath);
+    const pluginsSuffix = path.join(configDir, "plugins");
+
+    if (normalized.endsWith(pluginsSuffix)) {
+      return path.join(normalized, pluginId, "scripts", "todoist_client.py");
+    }
+    if (normalized.endsWith(configDir)) {
+      return path.join(normalized, "plugins", pluginId, "scripts", "todoist_client.py");
+    }
+    return path.join(normalized, configDir, "plugins", pluginId, "scripts", "todoist_client.py");
   }
 
   private async runTodoistCommand(args: string[]): Promise<string> {
