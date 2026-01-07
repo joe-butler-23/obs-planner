@@ -26,7 +26,7 @@ const ctx = await esbuild.context({
     "@codemirror/view",
     "@lezer/common"
   ],
-  outfile: "main.js",
+  outfile: "dist/main.js",
   sourcemap: isProd ? false : "inline",
   plugins: [patchJkanban],
   loader: {
