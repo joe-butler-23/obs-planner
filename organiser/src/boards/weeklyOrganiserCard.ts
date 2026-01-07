@@ -112,7 +112,19 @@ export const renderWeeklyOrganiserCard = (
 		exercise: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>`,
 		task: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="m9 12 2 2 4-4"/></svg>`,
 	};
-	const icon = iconByType[item.type] ?? iconByType.task;
+	const isRecipe = item.type === "recipe";
+	const isScheduled = Boolean(item.date);
+	const icon = isRecipe && !isScheduled
+		? `<label class="organiser-card__marked-toggle">
+				<input
+					type="checkbox"
+					class="organiser-card__marked-input"
+					data-item-id="${escapeHtml(item.id)}"
+					aria-label="Marked"
+					${item.marked ? "checked" : ""}
+				/>
+			</label>`
+		: iconByType[item.type] ?? iconByType.task;
 
 	const title = escapeHtml(toSafeString(item.title));
 	const coverImage = resolveCoverImage(app, item);

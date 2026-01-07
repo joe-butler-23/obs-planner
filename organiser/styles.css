@@ -581,6 +581,21 @@
 	display: inline-block;
 }
 
+.organiser-card__marked-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+}
+
+.organiser-card__marked-input {
+	margin: 0;
+	width: 16px;
+	height: 16px;
+	accent-color: var(--interactive-accent);
+}
+
 .gu-mirror {
 	position: fixed !important;
 	margin: 0 !important;
