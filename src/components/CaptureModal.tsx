@@ -23,8 +23,6 @@ export class CaptureModal extends Modal {
       .setDesc("Current watched inbox.")
       .addText((text) => text.setDisabled(true).setValue(this.plugin.settings.inboxFolder));
 
-    contentEl.createEl("h3", { text: "Add URL directly" });
-
     const urlSetting = new Setting(contentEl)
       .setName("Recipe URL")
       .setDesc("Paste a recipe URL to create an inbox job.")
