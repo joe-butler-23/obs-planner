@@ -721,6 +721,13 @@
 .cooking-db__grid-container {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-y: auto;
+}
+.cooking-db__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--cooking-db-card-size, 220px));
+  gap: 12px;
+  justify-content: start;
 }
 .cooking-db__card {
   border: 1px solid var(--background-modifier-border);
@@ -734,7 +741,7 @@
   content-visibility: auto;
   contain: layout style paint;
   width: 100%;
-  height: 100%;
+  height: calc(var(--cooking-db-card-size, 220px) + 110px);
 }
 .cooking-db__card:hover {
   transform: translateY(-2px);

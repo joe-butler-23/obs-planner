@@ -1,14 +1,7 @@
 import * as React from "react";
 import { setIcon } from "obsidian";
-import * as ReactWindow from "react-window";
 import { RecipeIndexItem, RecipeIndexSort } from "../../modules/cooking/types";
 import { CookingAssistantSettings } from "../../settings";
-
-// Safe import for react-window
-const FixedSizeGrid = ReactWindow.FixedSizeGrid;
-const areEqual = ReactWindow.areEqual;
-// Types must be imported separately
-import { GridChildComponentProps } from "react-window";
 
 export type MarkedFilter = "all" | "marked" | "unmarked";
 export type ScheduledFilter = "all" | "scheduled" | "unscheduled";
@@ -38,38 +31,6 @@ interface CookingDatabaseProps {
 
 const formatDate = (value: string | null) => (value ? value : "");
 
-type GridData = {
-  recipes: RecipeIndexItem[];
-  columnCount: number;
-  cardWidth: number;
-  cardHeight: number;
-  gap: number;
-  resolveCover: (path: string | null, source: string) => string | null;
-  onOpenRecipe: (path: string, split: boolean) => void;
-  onToggleMarked: (path: string, marked: boolean) => Promise<void>;
-};
-
-const Cell = React.memo(({ columnIndex, rowIndex, style, data }: GridChildComponentProps<GridData>) => {
-  const { recipes, columnCount, cardWidth, cardHeight, resolveCover, onOpenRecipe, onToggleMarked } = data;
-  const index = rowIndex * columnCount + columnIndex;
-  const recipe = recipes[index];
-
-  if (!recipe) return null;
-
-  return (
-    <div style={style}>
-      <div style={{ width: cardWidth, height: cardHeight }}>
-        <RecipeCard
-          recipe={recipe}
-          coverPath={resolveCover(recipe.coverPath, recipe.path)}
-          onOpen={(split) => onOpenRecipe(recipe.path, split)}
-          onToggleMarked={(marked) => onToggleMarked(recipe.path, marked)}
-        />
-      </div>
-    </div>
-  );
-}, areEqual);
-
 export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
   recipes,
   totalCount,
@@ -85,7 +46,6 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
   const [search, setSearch] = React.useState(state.search);
   const [tagMenuOpen, setTagMenuOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [gridSize, setGridSize] = React.useState({ width: 0, height: 0 });
 
   // Sync local search if prop changes
   React.useEffect(() => {
@@ -118,55 +78,59 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
     return () => document.removeEventListener("click", handler);
   }, [tagMenuOpen]);
 
-  // Custom AutoSizer logic using ResizeObserver
+  // Update CSS variables for responsive grid
   React.useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setGridSize({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height
-        });
+    const updateSize = () => {
+      const grid = container.querySelector(".cooking-db__grid");
+      if (!grid) return;
+      
+      const baseWidth = Math.max(160, settings.databaseCardMinWidth || 220);
+      const scaledBase = Math.max(140, Math.round(baseWidth * 0.8));
+      const minWidth = Math.max(140, scaledBase - 12);
+      const maxWidth = Math.max(minWidth, scaledBase + 28);
+      
+      container.style.setProperty("--cooking-db-card-min", `${minWidth}px`);
+      container.style.setProperty("--cooking-db-card-max", `${maxWidth}px`);
+
+      const containerWidth = grid.clientWidth;
+      if (!containerWidth) return;
+      
+      const gap = 12;
+      const maxColumns = Math.max(1, Math.floor((containerWidth + gap) / (minWidth + gap)));
+      
+      let bestWidth = minWidth;
+      let bestWhitespace = Number.POSITIVE_INFINITY;
+
+      for (let cols = 1; cols <= maxColumns; cols += 1) {
+        const rawWidth = (containerWidth - gap * (cols - 1)) / cols;
+        const width = Math.floor(rawWidth);
+        if (width < minWidth || width > maxWidth) continue;
+        const used = width * cols + gap * (cols - 1);
+        const whitespace = containerWidth - used;
+        if (whitespace < bestWhitespace) {
+          bestWhitespace = whitespace;
+          bestWidth = width;
+        }
       }
-    });
 
+      if (!Number.isFinite(bestWhitespace)) {
+        const width = Math.floor((containerWidth - gap * (maxColumns - 1)) / maxColumns);
+        bestWidth = Math.max(minWidth, Math.min(maxWidth, width));
+      }
+
+      container.style.setProperty("--cooking-db-card-size", `${bestWidth}px`);
+    };
+
+    const observer = new ResizeObserver(updateSize);
     observer.observe(container);
-    // Initial size
-    setGridSize({
-      width: container.clientWidth,
-      height: container.clientHeight
-    });
-
     return () => observer.disconnect();
-  }, []);
-
-  // Grid calculation
-  const GAP = 12;
-  const MIN_CARD_WIDTH = Math.max(160, settings.databaseCardMinWidth || 220);
-  const scaledBase = Math.max(140, Math.round(MIN_CARD_WIDTH * 0.8));
-  const minWidth = Math.max(140, scaledBase - 12);
-  const columnCount = Math.max(1, Math.floor((gridSize.width + GAP) / (minWidth + GAP)));
-  const totalGapSpace = GAP * (columnCount - 1);
-  const availableWidth = Math.max(0, gridSize.width - totalGapSpace);
-  const cardWidth = Math.floor(availableWidth / columnCount);
-  const rowCount = Math.ceil(recipes.length / columnCount);
-  const cardHeight = cardWidth + 110;
-
-  const itemData: GridData = {
-    recipes,
-    columnCount,
-    cardWidth,
-    cardHeight,
-    gap: GAP,
-    resolveCover,
-    onOpenRecipe,
-    onToggleMarked
-  };
+  }, [settings.databaseCardMinWidth]);
 
   return (
-    <div className="cooking-db">
+    <div className="cooking-db" ref={containerRef}>
       <div className="cooking-db__header">
         <h2>Recipe Database</h2>
         <div className="cooking-db__count">
@@ -282,20 +246,22 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
         </select>
       </div>
 
-      <div className="cooking-db__grid-container" ref={containerRef}>
-        {gridSize.width > 0 && gridSize.height > 0 && (
-          <FixedSizeGrid
-            columnCount={columnCount}
-            columnWidth={cardWidth + GAP}
-            height={gridSize.height}
-            rowCount={rowCount}
-            rowHeight={cardHeight + GAP}
-            width={gridSize.width}
-            itemData={itemData}
-          >
-            {Cell}
-          </FixedSizeGrid>
-        )}
+      <div className="cooking-db__grid-container">
+        <div className="cooking-db__grid">
+          {recipes.length === 0 ? (
+            <div className="cooking-db__empty">No recipes found.</div>
+          ) : (
+            recipes.map((recipe) => (
+              <RecipeCard
+                key={recipe.path}
+                recipe={recipe}
+                coverPath={resolveCover(recipe.coverPath, recipe.path)}
+                onOpen={(split) => onOpenRecipe(recipe.path, split)}
+                onToggleMarked={(marked) => onToggleMarked(recipe.path, marked)}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
