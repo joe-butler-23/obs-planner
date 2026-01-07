@@ -120,8 +120,6 @@ export class RecipeIndexService {
         delete frontmatter.marked;
       }
     });
-
-    this.cache.delete(path);
   }
 
   private compareItems(a: CachedRecipe, b: CachedRecipe, sortBy: RecipeIndexSort) {
