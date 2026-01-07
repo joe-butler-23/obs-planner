@@ -78,9 +78,6 @@ export class CookingDatabaseView extends ItemView {
   }
 
   private scheduleRender() {
-    if (Date.now() < this.suppressRefreshUntil && this.currentState.marked === "all") {
-      return;
-    }
     if (this.refreshTimer !== null) {
       window.clearTimeout(this.refreshTimer);
     }
@@ -147,13 +144,8 @@ export class CookingDatabaseView extends ItemView {
           }}
           onOpenRecipe={(path, split) => this.openRecipe(path, split)}
           onToggleMarked={async (path, marked) => {
-            if (this.currentState.marked === "all") {
-              this.suppressRefreshUntil = Date.now() + 750;
-            }
             await this.index.setMarked(path, marked);
-            if (this.currentState.marked !== "all") {
-              this.scheduleRender();
-            }
+            this.scheduleRender();
           }}
           onOpenPlanner={() => void this.plugin.openCookingPlannerView()}
           resolveCover={(coverPath, sourcePath) => this.resolveImagePath(coverPath, sourcePath)}
