@@ -8,6 +8,12 @@ Unified Obsidian-first workflow for the cooking project:
 - Recipe Database view for fast card-based browsing and marking
 - Guaranteed `.webp` cover images and existing frontmatter schema (`title`, `type: recipe`, `source`, `added`, `cover`, `cooked`, `marked`, `scheduled`, `tags`)
 
+## Setup
+1. **Gemini API Key:** Required for AI extraction and Gemini-mode shopping lists. Stored locally.
+2. **Todoist API Token:** Required for sending shopping lists and Bridge Club tasks. Stored locally.
+3. **Inbox Folder:** Configure a folder (default `inbox/`) to watch for capture jobs. Use Syncthing or Git to drop files here from mobile.
+4. **Archive Folder:** Processed jobs are moved here (default `inbox/archive/`).
+
 ## Workflow (flowchart)
 ```mermaid
 flowchart TD
@@ -70,6 +76,7 @@ flowchart TD
 - Uses scheduled recipes only. Gemini mode reads full recipe markdown and outputs the merged shopping list directly.
 - Preview option writes a markdown snapshot to `~/projects/sys-arc/resources/todoist-preview.md`.
 - Also creates `🥕 - recipe title` tasks in the Bridge club project on the scheduled date (de-duped).
+- Requires a valid **Todoist API Token** in settings.
 - Labeler mode (Settings -> Todoist):
   - **Gemini only**: Gemini Flash (latest) generates the shopping list items + labels; failures abort sending and log to Health.
   - **Deterministic only**: built-in keyword rules.

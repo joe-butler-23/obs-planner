@@ -17,8 +17,10 @@ created: 2026-01-07
 
 ## Active
 - [ ] T11 **Release Prep**
-    - [ ] Update `manifest.json` version.
-    - [ ] Update README with new architecture details.
+    - [ ] T11.1 **Versioning:** Bump version in `manifest.json` and `package.json` to 0.1.0.
+    - [ ] T11.2 **Documentation:** Update README.md to reflect Async Inbox architecture and new Todoist settings.
+    - [ ] T11.3 **Polish:** Remove debug console logs and verify UI error states.
+    - [ ] T11.4 **Final Sync:** Perform a final git push to confirm remote parity.
 
 ## Completed
 - [x] T1 Consolidate repositories (obs-sync, organiser, helper) into unified monorepo.
