@@ -274,12 +274,21 @@ const RecipeCard: React.FC<{
   onToggleMarked: (marked: boolean) => Promise<void>;
 }> = React.memo(({ recipe, coverPath, onOpen, onToggleMarked }) => {
   const [toggleDisabled, setToggleDisabled] = React.useState(false);
+  const [optimisticMarked, setOptimisticMarked] = React.useState(recipe.marked);
+
+  React.useEffect(() => {
+    setOptimisticMarked(recipe.marked);
+  }, [recipe.marked]);
 
   const handleToggle = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("[RecipeCard] Toggle change", { checked: e.target.checked, path: recipe.path });
+    const newValue = e.target.checked;
+    setOptimisticMarked(newValue);
     setToggleDisabled(true);
     try {
-      await onToggleMarked(e.target.checked);
+      await onToggleMarked(newValue);
+    } catch (err) {
+      setOptimisticMarked(!newValue);
+      console.error("Failed to toggle marked", err);
     } finally {
       setToggleDisabled(false);
     }
@@ -297,10 +306,7 @@ const RecipeCard: React.FC<{
       className="cooking-db__card"
       data-path={recipe.path}
       tabIndex={0}
-      onClick={(e) => {
-        console.log("[RecipeCard] Card click", recipe.path);
-        onOpen(e.ctrlKey || e.metaKey);
-      }}
+      onClick={(e) => onOpen(e.ctrlKey || e.metaKey)}
       onKeyDown={handleKeyDown}
     >
       <div className={`cooking-db__cover ${!coverPath ? "cooking-db__cover--empty" : ""}`}>
@@ -315,17 +321,13 @@ const RecipeCard: React.FC<{
         </div>
         <div
           className="cooking-db__actions"
-          onClick={(e) => {
-            console.log("[RecipeCard] Actions container click - stopping propagation");
-            e.stopPropagation();
-          }}
+          onClick={(e) => e.stopPropagation()}
         >
           <label className="cooking-db__toggle">
             <input
               type="checkbox"
-              checked={recipe.marked}
+              checked={optimisticMarked}
               onChange={handleToggle}
-              onClick={(e) => console.log("[RecipeCard] Input click")}
               disabled={toggleDisabled}
             />
             <span>Marked</span>
