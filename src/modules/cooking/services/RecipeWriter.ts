@@ -69,7 +69,6 @@ export class RecipeWriter {
   }
 
   private async convertToWebp(bytes: ArrayBuffer, mimeType: string): Promise<ArrayBuffer> {
-    if (mimeType === "image/webp") return bytes;
     if (typeof document === "undefined") {
       throw new Error("Image conversion requires DOM APIs");
     }
@@ -77,14 +76,31 @@ export class RecipeWriter {
     const blob = new Blob([bytes], { type: mimeType || "image/png" });
     const image = await this.blobToImage(blob);
 
+    // Calculate resize dimensions (800px max in any direction)
+    const MAX_DIMENSION = 800;
+    let width = image.width;
+    let height = image.height;
+
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      const scale = MAX_DIMENSION / Math.max(width, height);
+      width = Math.floor(width * scale);
+      height = Math.floor(height * scale);
+
+      console.debug('[RecipeWriter] Resizing image', {
+        original: { width: image.width, height: image.height },
+        resized: { width, height },
+        scale
+      });
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = image.width;
-    canvas.height = image.height;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       throw new Error("Unable to acquire canvas context for image conversion");
     }
-    ctx.drawImage(image, 0, 0);
+    ctx.drawImage(image, 0, 0, width, height);
 
     const webpBlob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(

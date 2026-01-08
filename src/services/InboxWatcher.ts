@@ -8,6 +8,7 @@ import { DuplicateRecipeError, RecipeWriter } from "../modules/cooking/services/
 
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp"]);
 const SUPPORTED_TEXT_EXTENSIONS = new Set(["txt", "md"]);
+const URL_PATTERN = /^(https?:\/\/[^\s]+)$/i;
 
 export const inboxJobSchema = z.object({
   type: z.enum(["url", "text", "image"]),
@@ -34,6 +35,8 @@ type JobBuildResult = {
 
 export class InboxWatcher {
   private readonly inFlight = new Set<string>();
+  private readonly fileStats = new Map<string, { mtime: number; size: number }>();
+  private readonly debounceTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly app: App,
@@ -46,7 +49,17 @@ export class InboxWatcher {
 
   async handleFileEvent(file: TFile) {
     if (this.shouldSkipFile(file)) return;
-    await this.processFile(file);
+
+    // Debounce rapid file changes
+    const existingTimer = this.debounceTimers.get(file.path);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    this.debounceTimers.set(file.path, setTimeout(async () => {
+      this.debounceTimers.delete(file.path);
+      await this.processFile(file);
+    }, 500));
   }
 
   async scanInbox() {
@@ -81,6 +94,23 @@ export class InboxWatcher {
 
   private async processFile(file: TFile) {
     if (this.inFlight.has(file.path)) return;
+
+    // Check for race condition - file changed during processing
+    const currentStats = { mtime: file.stat.mtime, size: file.stat.size };
+    const previousStats = this.fileStats.get(file.path);
+
+    if (previousStats &&
+        (previousStats.mtime !== currentStats.mtime || previousStats.size !== currentStats.size)) {
+      console.debug('[InboxWatcher] File changed during processing, skipping', {
+        path: file.path,
+        previous: previousStats,
+        current: currentStats
+      });
+      this.fileStats.set(file.path, currentStats);
+      return;
+    }
+
+    this.fileStats.set(file.path, currentStats);
     this.inFlight.add(file.path);
 
     let job: InboxJob | null = null;
@@ -88,6 +118,12 @@ export class InboxWatcher {
     let secondaryFile: TFile | undefined;
 
     try {
+      console.debug('[InboxWatcher] Processing file', {
+        path: file.path,
+        mtime: file.stat.mtime,
+        size: file.stat.size,
+        timestamp: new Date().toISOString()
+      });
       const build = await this.buildJob(file);
       job = build.job;
       jobKey = build.jobKey;
@@ -110,6 +146,11 @@ export class InboxWatcher {
         await this.archive(secondaryFile);
       }
 
+      console.debug('[InboxWatcher] Successfully processed file', {
+        path: file.path,
+        recipePath,
+        timestamp: new Date().toISOString()
+      });
       this.notify(`Imported: ${recipePath}`);
     } catch (error) {
       if (error instanceof DuplicateRecipeError) {
@@ -124,12 +165,18 @@ export class InboxWatcher {
         return;
       }
 
-      console.error(`Failed to process ${file.path}`, error);
+      console.error('[InboxWatcher] Failed to process file', {
+        path: file.path,
+        jobType: job?.type,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
       const reason = error instanceof Error ? error.message : "Unknown error";
       this.ledger.recordError(jobKey, reason);
       await this.quarantine(file, reason, job ?? undefined);
     } finally {
       this.inFlight.delete(file.path);
+      this.fileStats.delete(file.path);
     }
   }
 
@@ -200,7 +247,7 @@ export class InboxWatcher {
   }
 
   private looksLikeUrl(value: string) {
-    return /^(https?:\/\/[^\s]+)$/i.test(value.trim());
+    return URL_PATTERN.test(value.trim());
   }
 
   private isImageExtension(extension: string) {
@@ -264,14 +311,25 @@ export class InboxWatcher {
     const extension = path.includes(".") ? path.split(".").pop() ?? "" : "";
     const base = extension ? path.slice(0, -(extension.length + 1)) : path;
 
+    const MAX_ITERATIONS = 1000;
     let counter = 1;
-    while (true) {
+
+    while (counter <= MAX_ITERATIONS) {
       const candidate = extension ? `${base}-${counter}.${extension}` : `${base}-${counter}`;
       if (!this.app.vault.getAbstractFileByPath(candidate)) {
+        if (counter > 100) {
+          console.warn('[InboxWatcher] High archive path collision count', {
+            path,
+            counter,
+            timestamp: new Date().toISOString()
+          });
+        }
         return candidate;
       }
       counter += 1;
     }
+
+    throw new Error(`Archive path collision limit exceeded for: ${path}`);
   }
 
   private async quarantine(file: TFile, reason: string, job?: InboxJob) {

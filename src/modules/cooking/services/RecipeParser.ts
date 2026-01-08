@@ -7,6 +7,15 @@ export type HtmlExtraction = {
   imageUrl?: string;
 };
 
+const NEWLINE_PATTERN = /\r?\n+/;
+const IMAGE_EXT_PATTERN = /\.(jpg|jpeg|png|webp)(\?|#|$)/i;
+const OG_IMAGE_PROPERTY_FIRST = /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"]+)["']/i;
+const OG_IMAGE_CONTENT_FIRST = /<meta[^>]*content=["']([^"]+)["'][^>]*property=["']og:image["']/i;
+const IMG_TAG_PATTERN = /<img[^>]*src=["']([^"']+\.(jpg|jpeg|png|webp)[^"']*)["']/gi;
+const SRC_ATTR_PATTERN = /src=["']([^"']+)["']/i;
+
+let lastFetchTime = 0;
+
 const trimString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
 const toStringList = (value: unknown): string[] => {
@@ -25,7 +34,7 @@ const toStringList = (value: unknown): string[] => {
 
 const splitSteps = (value: string) =>
   value
-    .split(/\r?\n+/) // Corrected: escaped backslash for regex
+    .split(NEWLINE_PATTERN)
     .map((step) => step.trim())
     .filter(Boolean);
 
@@ -106,7 +115,7 @@ const extractFirstImageFromDoc = (doc: Document, pageUrl: string) => {
     if (normalized.includes("logo") || normalized.includes("icon") || normalized.includes("avatar")) {
       continue;
     }
-    if (!/\.(jpg|jpeg|png|webp)(\?|#|$)/i.test(normalized)) continue; // Corrected: escaped backslash for regex
+    if (!IMAGE_EXT_PATTERN.test(normalized)) continue;
     return resolveUrl(src, pageUrl);
   }
   return undefined;
@@ -229,6 +238,39 @@ export const extractRecipeFromHtml = (html: string, pageUrl: string): HtmlExtrac
   };
 };
 
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutError: string
+): Promise<T> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const result = await promise;
+    clearTimeout(timeoutId);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(timeoutError);
+    }
+    throw error;
+  }
+};
+
+const rateLimit = async () => {
+  const MIN_DELAY_MS = 2000;
+  const now = Date.now();
+  const timeSinceLastFetch = now - lastFetchTime;
+
+  if (timeSinceLastFetch < MIN_DELAY_MS) {
+    await new Promise(resolve => setTimeout(resolve, MIN_DELAY_MS - timeSinceLastFetch));
+  }
+
+  lastFetchTime = Date.now();
+};
+
 export const fetchHtmlFromPage = async (pageUrl: string): Promise<string | null> => {
   const corsProxies = [
     (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
@@ -236,19 +278,36 @@ export const fetchHtmlFromPage = async (pageUrl: string): Promise<string | null>
   ];
 
   const tryFetch = async (url: string) => {
-    const response = await fetch(url, {
-      headers: { Accept: "text/html,application/xhtml+xml" }
-    });
+    const controller = new AbortController();
+    const response = await withTimeout(
+      fetch(url, {
+        headers: { Accept: "text/html,application/xhtml+xml" },
+        signal: controller.signal
+      }),
+      30000, // 30 second timeout
+      `Fetch timeout for ${url}`
+    );
+
     if (!response.ok) return null;
     return await response.text();
   };
 
   for (const proxyFn of corsProxies) {
     try {
+      await rateLimit();
       const proxyUrl = proxyFn(pageUrl);
+      console.debug('[RecipeParser] Fetching HTML', {
+        pageUrl,
+        proxyUrl,
+        timestamp: new Date().toISOString()
+      });
       const html = await tryFetch(proxyUrl);
       if (html) return html;
-    } catch {
+    } catch (error) {
+      console.debug('[RecipeParser] Fetch failed', {
+        pageUrl,
+        error: error instanceof Error ? error.message : String(error)
+      });
       continue;
     }
   }
@@ -288,16 +347,16 @@ export const extractOgImageFromHtml = (html: string, pageUrl: string): string | 
   }
 
   const ogImageMatch =
-    html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"]+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"]+)["'][^>]*property=["']og:image["']/i);
+    html.match(OG_IMAGE_PROPERTY_FIRST) ||
+    html.match(OG_IMAGE_CONTENT_FIRST);
   if (ogImageMatch?.[1]) {
     return resolveUrl(ogImageMatch[1], pageUrl);
   }
 
-  const imgMatches = html.match(/<img[^>]*src=["']([^"']+\.(jpg|jpeg|png|webp)[^"']*)["']/gi);
+  const imgMatches = html.match(IMG_TAG_PATTERN);
   if (imgMatches?.length) {
     for (const imgTag of imgMatches) {
-      const srcMatch = imgTag.match(/src=["']([^"']+)["']/i);
+      const srcMatch = imgTag.match(SRC_ATTR_PATTERN);
       if (
         srcMatch?.[1] &&
         !srcMatch[1].includes("logo") &&
@@ -331,7 +390,16 @@ export const fetchImageAsArrayBuffer = async (
   ];
 
   const tryFetch = async (url: string) => {
-    const response = await fetch(url, { headers: { Accept: "image/*" } });
+    const controller = new AbortController();
+    const response = await withTimeout(
+      fetch(url, {
+        headers: { Accept: "image/*" },
+        signal: controller.signal
+      }),
+      60000, // 60 second timeout for images
+      `Image fetch timeout for ${url}`
+    );
+
     if (!response.ok) return null;
     const blob = await response.blob();
     const contentType = response.headers.get("content-type") || blob.type || "";
@@ -341,22 +409,50 @@ export const fetchImageAsArrayBuffer = async (
       contentType.includes("jpeg") ||
       contentType.includes("png");
 
-    if (!isImage || blob.size < 1024) return null;
+    const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (!isImage || blob.size < 1024 || blob.size > MAX_IMAGE_SIZE) {
+      if (blob.size > MAX_IMAGE_SIZE) {
+        console.warn('[RecipeParser] Image too large, skipping', {
+          url,
+          sizeMB: (blob.size / 1024 / 1024).toFixed(2)
+        });
+      }
+      return null;
+    }
+
     return { data: await blob.arrayBuffer(), mimeType: blob.type || "image/webp" };
   };
 
   try {
+    await rateLimit();
+    console.debug('[RecipeParser] Fetching image', {
+      imageUrl,
+      timestamp: new Date().toISOString()
+    });
     const direct = await tryFetch(imageUrl);
     if (direct) return direct;
-  } catch {
-    // Fall through to proxies
+  } catch (error) {
+    console.debug('[RecipeParser] Direct image fetch failed', {
+      imageUrl,
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 
   for (const proxyFn of imageProxies) {
     try {
-      const proxied = await tryFetch(proxyFn(imageUrl));
+      await rateLimit();
+      const proxyUrl = proxyFn(imageUrl);
+      console.debug('[RecipeParser] Trying image proxy', {
+        imageUrl,
+        proxyUrl
+      });
+      const proxied = await tryFetch(proxyUrl);
       if (proxied) return proxied;
-    } catch {
+    } catch (error) {
+      console.debug('[RecipeParser] Proxy image fetch failed', {
+        imageUrl,
+        error: error instanceof Error ? error.message : String(error)
+      });
       continue;
     }
   }

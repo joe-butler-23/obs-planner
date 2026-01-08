@@ -15,6 +15,19 @@ export type GeminiImagePayload = {
   mimeType: string;
 };
 
+interface GeminiLabelResponse {
+  labels: string[];
+}
+
+interface GeminiShoppingItem {
+  content: string;
+  label: string;
+}
+
+interface GeminiShoppingResponse {
+  items: GeminiShoppingItem[];
+}
+
 const MAX_SOURCE_TEXT_CHARS = 20000;
 
 const STRICT_SYSTEM_INSTRUCTION =
@@ -239,7 +252,7 @@ export class GeminiService {
       throw new Error("No response from Gemini");
     }
 
-    const parsed = JSON.parse(text) as { labels?: unknown };
+    const parsed = JSON.parse(text) as GeminiLabelResponse;
     if (!Array.isArray(parsed.labels)) {
       throw new Error("Gemini response missing labels array");
     }
@@ -328,24 +341,24 @@ export class GeminiService {
       throw new Error("No response from Gemini");
     }
 
-    const parsed = JSON.parse(text) as { items?: unknown };
+    const parsed = JSON.parse(text) as GeminiShoppingResponse;
     if (!Array.isArray(parsed.items)) {
       throw new Error("Gemini response missing items array");
     }
 
     const allowed = new Set(allowedLabels);
     return parsed.items.map((item) => {
-      if (!item || typeof item !== "object") {
-        throw new Error("Gemini returned invalid item");
+      if (!item || typeof item.content !== 'string' || typeof item.label !== 'string') {
+        throw new Error("Gemini returned invalid item structure");
       }
-      const content = "content" in item ? String((item as any).content ?? "").trim() : "";
-      const rawLabel = "label" in item ? String((item as any).label ?? "").trim() : "";
-      const label = rawLabel.toLowerCase();
+      const content = item.content.trim();
+      const label = item.label.trim().toLowerCase();
+
       if (!content) {
         throw new Error("Gemini returned empty content");
       }
       if (!label || !allowed.has(label)) {
-        throw new Error(`Gemini returned unsupported label: ${rawLabel}`);
+        throw new Error(`Gemini returned unsupported label: ${item.label}`);
       }
       return { content, label };
     });

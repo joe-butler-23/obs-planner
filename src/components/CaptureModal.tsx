@@ -1,6 +1,8 @@
 import { App, Modal, Notice, Setting, normalizePath } from "obsidian";
 import CookingAssistantPlugin from "../main";
 
+const URL_PATTERN = /^(https?:\/\/[^\s]+)$/i;
+
 export class CaptureModal extends Modal {
   private urlValue = "";
   private isSubmitting = false;
@@ -49,7 +51,7 @@ export class CaptureModal extends Modal {
   }
 
   private looksLikeUrl(value: string) {
-    return /^(https?:\/\/[^\s]+)$/i.test(value.trim());
+    return URL_PATTERN.test(value.trim());
   }
 
   private async handleSubmit() {

@@ -5,6 +5,9 @@ import type { RecipeIndexSort } from "./services/RecipeIndexService";
 export interface CookingAssistantSettings {
   geminiApiKey: string;
   todoistToken: string;
+  todoistShoppingProjectId: string;
+  todoistBridgeClubProjectId: string;
+  todoistBridgeClubProjectMatch: string;
   recipesFolder: string;
   inboxFolder: string;
   archiveFolder: string;
@@ -20,6 +23,9 @@ export interface CookingAssistantSettings {
 export const DEFAULT_SETTINGS: CookingAssistantSettings = {
   geminiApiKey: "",
   todoistToken: "",
+  todoistShoppingProjectId: "",
+  todoistBridgeClubProjectId: "",
+  todoistBridgeClubProjectMatch: "bridge club",
   recipesFolder: "recipes",
   inboxFolder: "inbox",
   archiveFolder: "inbox/archive",
@@ -110,6 +116,42 @@ export class CookingAssistantSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.todoistToken)
           .onChange(async (value) => {
             this.plugin.settings.todoistToken = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Shopping Project ID")
+      .setDesc("Leave empty to use project discovery. Get ID from Todoist project URL.")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.todoistShoppingProjectId)
+          .onChange(async (value) => {
+            this.plugin.settings.todoistShoppingProjectId = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Bridge Club Project ID")
+      .setDesc("Project for scheduled recipe tasks. Leave empty to search by name.")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.todoistBridgeClubProjectId)
+          .onChange(async (value) => {
+            this.plugin.settings.todoistBridgeClubProjectId = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Bridge Club Project Match")
+      .setDesc("Project name search term (used if Project ID not set).")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.todoistBridgeClubProjectMatch)
+          .onChange(async (value) => {
+            this.plugin.settings.todoistBridgeClubProjectMatch = value.trim() || DEFAULT_SETTINGS.todoistBridgeClubProjectMatch;
             await this.plugin.saveSettings();
           })
       );

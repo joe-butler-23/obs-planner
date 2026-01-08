@@ -41,6 +41,39 @@ flowchart TD
                                ↳ dedupe + archive/error quarantine
 ```
 
+## Privacy & External Services
+
+When processing recipe URLs, this plugin uses public CORS proxy services to bypass browser same-origin restrictions:
+
+**HTML Fetching:**
+- `api.allorigins.win` - CORS proxy for HTML content
+- `corsproxy.io` - Backup CORS proxy
+
+**Image Fetching:**
+- `wsrv.nl` - Image optimization and conversion service
+- `cdn.statically.io` - Static content CDN
+- `corsproxy.io` - CORS proxy fallback
+- `api.allorigins.win` - CORS proxy fallback
+
+**What this means:**
+- Recipe URLs and content pass through these third-party services temporarily
+- These services cache and forward requests to fetch recipe data
+- Images are fetched and converted to WebP format through proxies
+- Rate limiting (2-second delay) prevents hammering external services
+
+**Privacy-conscious alternative:**
+If you prefer not to use these proxies:
+1. Manually download recipe content as text files
+2. Save recipe images locally
+3. Drop both into your `inbox/` folder
+4. The plugin will process them without external requests
+
+**Local-only features:**
+- Gemini API calls go directly to Google (no intermediary)
+- Todoist API calls go directly to Todoist (no intermediary)
+- All recipe storage and indexing happens locally in your vault
+- API keys are stored locally in plugin data (never sent to third parties)
+
 ## Inbox schema (strict)
 ```json
 {

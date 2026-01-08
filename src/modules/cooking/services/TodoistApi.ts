@@ -1,8 +1,5 @@
 import { requestUrl } from "obsidian";
 
-export const SHOPPING_PROJECT_ID = "2353762598";
-export const BRIDGE_CLUB_PROJECT_MATCH = "bridge club";
-
 export type TodoistTaskPayload = {
   content: string;
   labels?: string[];
@@ -37,7 +34,14 @@ export class TodoistApi {
     });
 
     if (response.status >= 400) {
-      throw new Error(`Todoist API error (${response.status}): ${response.text}`);
+      console.error('[TodoistApi] API request failed', {
+        method,
+        path,
+        status: response.status,
+        response: response.text,
+        timestamp: new Date().toISOString()
+      });
+      throw new Error(`Todoist API error (${response.status})`);
     }
 
     return response.json;
@@ -52,11 +56,41 @@ export class TodoistApi {
   }
 
   async createBatch(projectId: string, tasks: TodoistTaskPayload[]) {
+    if (tasks.length === 0) return [];
+
+    console.debug('[TodoistApi] Creating batch of tasks', {
+      projectId,
+      count: tasks.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // Process in parallel with concurrency limit of 5
+    const CONCURRENCY_LIMIT = 5;
     const created = [];
-    for (const task of tasks) {
-      const res = await this.request("POST", "/tasks", { ...task, project_id: projectId });
-      created.push(res);
+
+    for (let i = 0; i < tasks.length; i += CONCURRENCY_LIMIT) {
+      const batch = tasks.slice(i, i + CONCURRENCY_LIMIT);
+      const batchResults = await Promise.all(
+        batch.map(task =>
+          this.request("POST", "/tasks", { ...task, project_id: projectId })
+            .catch(error => {
+              console.error('[TodoistApi] Failed to create task in batch', {
+                content: task.content,
+                error: error instanceof Error ? error.message : String(error)
+              });
+              throw error;
+            })
+        )
+      );
+      created.push(...batchResults);
     }
+
+    console.debug('[TodoistApi] Batch creation complete', {
+      projectId,
+      successCount: created.length,
+      timestamp: new Date().toISOString()
+    });
+
     return created;
   }
 }

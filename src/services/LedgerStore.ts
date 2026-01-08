@@ -9,6 +9,9 @@ export interface LedgerEntry {
 
 export class LedgerStore {
   private entries: Map<string, LedgerEntry>;
+  private pendingFlush: Promise<void> | null = null;
+  private retryCount = 0;
+  private readonly MAX_RETRIES = 3;
 
   constructor(
     initialEntries: LedgerEntry[],
@@ -64,7 +67,48 @@ export class LedgerStore {
 
   private flush() {
     this.prune();
-    void this.persist(this.serialize());
+
+    if (this.pendingFlush) {
+      return;
+    }
+
+    this.pendingFlush = this.persistWithRetry()
+      .catch((error) => {
+        console.error('[LedgerStore] Failed to persist ledger after retries', {
+          error: error instanceof Error ? error.message : String(error),
+          retryCount: this.retryCount,
+          timestamp: new Date().toISOString()
+        });
+      })
+      .finally(() => {
+        this.pendingFlush = null;
+        this.retryCount = 0;
+      });
+  }
+
+  private async persistWithRetry(): Promise<void> {
+    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        await this.persist(this.serialize());
+        return;
+      } catch (error) {
+        this.retryCount = attempt + 1;
+
+        if (attempt === this.MAX_RETRIES) {
+          throw error;
+        }
+
+        const backoffMs = Math.min(1000 * Math.pow(2, attempt), 5000);
+        console.warn('[LedgerStore] Persist failed, retrying', {
+          attempt: attempt + 1,
+          maxRetries: this.MAX_RETRIES,
+          backoffMs,
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
   }
 
   private prune() {

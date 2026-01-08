@@ -5,9 +5,7 @@ import path from "node:path";
 import CookingAssistantPlugin from "../../../main";
 import {
   TodoistApi,
-  TodoistTaskPayload,
-  SHOPPING_PROJECT_ID,
-  BRIDGE_CLUB_PROJECT_MATCH
+  TodoistTaskPayload
 } from "./TodoistApi";
 
 const ModalBase = (Modal ?? class {}) as typeof Modal;
@@ -1124,10 +1122,12 @@ export class TodoistShoppingListService {
       }
     }
 
+    const shoppingProjectId = await this.resolveShoppingProject();
+
     let created: Array<{ id: string; content: string; labels: string[] }> = [];
     try {
       created = await this.api.createBatch(
-        SHOPPING_PROJECT_ID,
+        shoppingProjectId,
         items.map((item) => ({
           content: item.content,
           labels: item.labels
@@ -1220,13 +1220,37 @@ export class TodoistShoppingListService {
     });
   }
 
-  private async resolveBridgeClubProject(): Promise<{ id: string; name: string }> {
+  private async resolveShoppingProject(): Promise<string> {
+    const configured = this.plugin.settings.todoistShoppingProjectId;
+    if (configured) {
+      return configured;
+    }
+
+    // Fallback: list projects and throw error with available options
     const projects = await this.api.listProjects();
+    throw new Error(
+      `Shopping project ID not configured. Available projects: ${projects.map(p => `${p.name} (${p.id})`).join(', ')}`
+    );
+  }
+
+  private async resolveBridgeClubProject(): Promise<{ id: string; name: string }> {
+    const configured = this.plugin.settings.todoistBridgeClubProjectId;
+    if (configured) {
+      const projects = await this.api.listProjects();
+      const found = projects.find(p => p.id === configured);
+      if (found) {
+        return { id: found.id, name: found.name };
+      }
+    }
+
+    // Fallback: search by name
+    const projects = await this.api.listProjects();
+    const matchString = this.plugin.settings.todoistBridgeClubProjectMatch || "bridge club";
     const match = projects.find((project) =>
-      project.name.toLowerCase().includes(BRIDGE_CLUB_PROJECT_MATCH)
+      project.name.toLowerCase().includes(matchString.toLowerCase())
     );
     if (!match) {
-      throw new Error("Bridge club project not found");
+      throw new Error(`Bridge club project not found. Searched for: "${matchString}". Available projects: ${projects.map(p => p.name).join(', ')}`);
     }
     return { id: match.id, name: match.name };
   }
