@@ -1058,9 +1058,23 @@ export class TodoistShoppingListService {
       return;
     }
 
+    let shoppingProjectId: string;
+    try {
+      shoppingProjectId = await this.resolveShoppingProject();
+    } catch (error) {
+      new Notice("Todoist project resolution failed.");
+      this.plugin.recordLedgerEntry(
+        "error",
+        ledgerKey,
+        `todoist: project resolution failed (${this.formatError(error)})`
+      );
+      console.error("Todoist project resolution failed", error);
+      return;
+    }
+
     let baselineCount = 0;
     try {
-      const current = await this.api.listTasks();
+      const current = await this.api.listTasks(shoppingProjectId);
       baselineCount = current.length;
     } catch (error) {
       new Notice("Todoist list failed. Check TODOIST_TOKEN.");
@@ -1121,8 +1135,6 @@ export class TodoistShoppingListService {
         return;
       }
     }
-
-    const shoppingProjectId = await this.resolveShoppingProject();
 
     let created: Array<{ id: string; content: string; labels: string[] }> = [];
     try {

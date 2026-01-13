@@ -47,7 +47,7 @@ export class TodoistApi {
     return response.json;
   }
 
-  async listTasks(projectId: string = SHOPPING_PROJECT_ID): Promise<any[]> {
+  async listTasks(projectId: string): Promise<any[]> {
     return this.request("GET", "/tasks", undefined, { project_id: projectId });
   }
 

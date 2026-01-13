@@ -671,6 +671,25 @@
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
 }
+.cooking-db__button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cooking-db__button:hover {
+  background: var(--background-secondary);
+}
+.cooking-db__button.mod-warning {
+  color: var(--text-error);
+  border-color: var(--text-error);
+}
+.cooking-db__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .cooking-db__tag-filter {
   position: relative;
 }

@@ -127,6 +127,7 @@ export class CookingDatabaseView extends ItemView {
       search: this.currentState.search,
       limit: settings.databaseMaxCards
     });
+    const markedCount = this.index.getMarkedCount(false);
 
     const tags = this.index.getAvailableTags();
 
@@ -135,6 +136,7 @@ export class CookingDatabaseView extends ItemView {
         <CookingDatabase
           recipes={recipes}
           totalCount={total}
+          markedCount={markedCount}
           availableTags={tags}
           settings={settings}
           state={this.currentState}
@@ -145,6 +147,10 @@ export class CookingDatabaseView extends ItemView {
           onOpenRecipe={(path, split) => this.openRecipe(path, split)}
           onToggleMarked={async (path, marked) => {
             await this.index.setMarked(path, marked);
+            this.scheduleRender();
+          }}
+          onClearMarked={async () => {
+            await this.index.clearAllMarked();
             this.scheduleRender();
           }}
           onOpenPlanner={() => void this.plugin.openCookingPlannerView()}

@@ -19,12 +19,14 @@ export interface DatabaseState {
 interface CookingDatabaseProps {
   recipes: RecipeIndexItem[];
   totalCount: number;
+  markedCount: number;
   availableTags: string[];
   settings: CookingAssistantSettings;
   state: DatabaseState;
   onStateChange: (state: DatabaseState) => void;
   onOpenRecipe: (path: string, split: boolean) => void;
   onToggleMarked: (path: string, marked: boolean) => Promise<void>;
+  onClearMarked: () => Promise<void>;
   onOpenPlanner: () => void;
   resolveCover: (path: string | null, source: string) => string | null;
 }
@@ -34,17 +36,20 @@ const formatDate = (value: string | null) => (value ? value : "");
 export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
   recipes,
   totalCount,
+  markedCount,
   availableTags,
   settings,
   state,
   onStateChange,
   onOpenRecipe,
   onToggleMarked,
+  onClearMarked,
   onOpenPlanner,
   resolveCover
 }) => {
   const [search, setSearch] = React.useState(state.search);
   const [tagMenuOpen, setTagMenuOpen] = React.useState(false);
+  const [clearPending, setClearPending] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   // Sync local search if prop changes
@@ -64,6 +69,20 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
 
   const updateState = (updates: Partial<DatabaseState>) => {
     onStateChange({ ...state, ...updates });
+  };
+
+  const handleClearMarked = async () => {
+    if (clearPending || markedCount === 0) return;
+    const message = `Clear marked status from ${markedCount} recipe${
+      markedCount === 1 ? "" : "s"
+    }?`;
+    if (!confirm(message)) return;
+    setClearPending(true);
+    try {
+      await onClearMarked();
+    } finally {
+      setClearPending(false);
+    }
   };
 
   // Tag menu click outside
@@ -223,6 +242,15 @@ export const CookingDatabase: React.FC<CookingDatabaseProps> = ({
           <option value="marked">Marked only</option>
           <option value="unmarked">Unmarked only</option>
         </select>
+
+        <button
+          className="cooking-db__button mod-warning"
+          type="button"
+          onClick={handleClearMarked}
+          disabled={markedCount === 0 || clearPending}
+        >
+          {clearPending ? "Clearing..." : "Clear marked"}
+        </button>
 
         <select
           className="cooking-db__select"

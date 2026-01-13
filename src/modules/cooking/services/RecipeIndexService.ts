@@ -107,6 +107,18 @@ export class RecipeIndexService {
     };
   }
 
+  getMarkedCount(refresh = true): number {
+    if (refresh) {
+      this.refresh();
+    }
+
+    let count = 0;
+    for (const item of this.cache.values()) {
+      if (item.marked) count += 1;
+    }
+    return count;
+  }
+
   async setMarked(path: string, value: boolean) {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) {
@@ -120,6 +132,15 @@ export class RecipeIndexService {
         delete frontmatter.marked;
       }
     });
+  }
+
+  async clearAllMarked() {
+    this.refresh();
+    const markedItems = Array.from(this.cache.values()).filter((item) => item.marked);
+    for (const item of markedItems) {
+      await this.setMarked(item.path, false);
+      item.marked = false;
+    }
   }
 
   private compareItems(a: CachedRecipe, b: CachedRecipe, sortBy: RecipeIndexSort) {
