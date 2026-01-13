@@ -30,6 +30,192 @@
   border-bottom: 1px solid var(--background-modifier-border);
   flex-shrink: 0;
 }
+.weekly-review-panel {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.weekly-review-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.weekly-review-title {
+  font-size: 0.95em;
+  font-weight: 600;
+}
+.weekly-review-meta {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+.weekly-review-hint {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+.weekly-review-empty {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  padding: 6px 0;
+}
+.weekly-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.weekly-review-row {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.weekly-review-row.is-disabled {
+  opacity: 0.7;
+}
+.weekly-review-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.weekly-review-row-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.weekly-review-row-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  margin: 0 auto;
+}
+.weekly-review-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--background-primary);
+  flex-shrink: 0;
+}
+.weekly-review-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.weekly-review-row-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.weekly-review-row-name {
+  font-weight: 600;
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.weekly-review-row-meta {
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+.weekly-review-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8em;
+  color: var(--text-normal);
+  white-space: nowrap;
+}
+.weekly-review-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.weekly-review-inline span {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.weekly-review-inline input,
+.weekly-review-inline select {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--text-normal);
+  font-size: 0.88em;
+}
+.weekly-review-inline--date input {
+  width: 128px;
+}
+.weekly-review-inline--rating select {
+  width: 64px;
+}
+.weekly-review-inline--again select {
+  width: 86px;
+}
+.weekly-review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+.weekly-review-field span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.weekly-review-field input,
+.weekly-review-field select,
+.weekly-review-field textarea {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  color: var(--text-normal);
+  font-size: 0.85em;
+}
+.weekly-review-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+.weekly-review-field--notes {
+  width: 100%;
+}
+.weekly-review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 720px) {
+  .weekly-review-row-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .weekly-review-row-controls {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin: 0;
+  }
+}
 .topbar-select {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);

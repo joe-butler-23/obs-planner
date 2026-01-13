@@ -62,7 +62,10 @@ const joinVaultPath = (baseDir: string, relativePath: string): string => {
 	return resolved.join("/");
 };
 
-const resolveCoverImage = (app: App, item: OrganiserItem): string => {
+export const resolveWeeklyOrganiserCoverImage = (
+	app: App,
+	item: OrganiserItem
+): string => {
 	const rawCoverImage =
 		typeof item.coverImage === "string" ? item.coverImage.trim() : "";
 	if (!rawCoverImage) return "";
@@ -127,7 +130,7 @@ export const renderWeeklyOrganiserCard = (
 		: iconByType[item.type] ?? iconByType.task;
 
 	const title = escapeHtml(toSafeString(item.title));
-	const coverImage = resolveCoverImage(app, item);
+	const coverImage = resolveWeeklyOrganiserCoverImage(app, item);
 	const escapedCoverImage = coverImage ? escapeHtml(coverImage) : "";
 
 	const imageHTML = escapedCoverImage

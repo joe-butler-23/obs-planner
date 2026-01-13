@@ -173,7 +173,9 @@ export class RecipeWriter {
       ingredients,
       "",
       "## Method",
-      method
+      method,
+      "",
+      "## Cook Log"
     ];
 
     return sections.filter((section) => section !== null).join("\n");

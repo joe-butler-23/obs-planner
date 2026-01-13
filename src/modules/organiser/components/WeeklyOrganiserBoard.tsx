@@ -1,7 +1,10 @@
 import * as React from "react";
 import { App, Notice, TFile, WorkspaceLeaf, moment } from "obsidian";
 import { createWeeklyOrganiserConfig } from "../boards/weeklyOrganiserConfig";
-import { renderWeeklyOrganiserCard } from "../boards/weeklyOrganiserCard";
+import {
+	renderWeeklyOrganiserCard,
+	resolveWeeklyOrganiserCoverImage,
+} from "../boards/weeklyOrganiserCard";
 import { useKanbanBoard } from "../hooks/useKanbanBoard";
 import { usePikadayDatePicker } from "../hooks/usePikadayDatePicker";
 import {
@@ -12,6 +15,10 @@ import {
 import { OrganiserItem } from "../types";
 import { buildBoardEntries } from "../kanban/buildBoardsData";
 import { FieldManager } from "../utils/field-manager";
+import {
+	appendCookLogEntryToFile,
+	CookLogEntryInput,
+} from "../../cooking/services/RecipeLogService";
 
 // Type cast for moment (Obsidian re-exports it)
 const momentFn: any = moment;
@@ -26,6 +33,18 @@ export type WeeklyOrganiserShoppingListPayload = {
 	recipePaths: string[];
 	weekLabel: string;
 	weekOffset: number;
+};
+
+type ReviewEntry = {
+	path: string;
+	title: string;
+	scheduledDate: string;
+	cookedDate: string;
+	coverUrl: string;
+	rating: string;
+	makeAgain: "" | "yes" | "no";
+	notes: string;
+	include: boolean;
 };
 
 /**
@@ -47,6 +66,9 @@ export const WeeklyOrganiserBoard = ({
 	const [showTimeControls, setShowTimeControls] = React.useState(true);
 	const [weekOffset, setWeekOffset] = React.useState(0);
 	const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+	const [isReviewOpen, setIsReviewOpen] = React.useState(false);
+	const [reviewEntries, setReviewEntries] = React.useState<ReviewEntry[]>([]);
+	const [isReviewSaving, setIsReviewSaving] = React.useState(false);
 	const calendarInputRef = React.useRef<HTMLInputElement>(null);
 	const calendarPopoverRef = React.useRef<HTMLDivElement>(null);
 	const calendarToggleRef = React.useRef<HTMLButtonElement>(null);
@@ -73,6 +95,71 @@ export const WeeklyOrganiserBoard = ({
 	const config = React.useMemo(
 		() => createWeeklyOrganiserConfig(weekOffset, activePreset),
 		[weekOffset, activePreset]
+	);
+
+	const normalizeReviewDate = React.useCallback((value?: string) => {
+		if (!value) return "";
+		const trimmed = value.trim();
+		if (!trimmed) return "";
+		if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+		const parsed = momentFn(trimmed);
+		return parsed.isValid() ? parsed.format("YYYY-MM-DD") : "";
+	}, []);
+
+	const isRecipePreset = React.useMemo(
+		() =>
+			activePreset.typeFilter.some(
+				(value) => value.toLowerCase() === "recipe"
+			),
+		[activePreset.typeFilter]
+	);
+
+	const loadReviewEntries = React.useCallback((): ReviewEntry[] => {
+		const { entriesByFile } = buildBoardEntries(app, config, {
+			logPrefix: "WeeklyOrganiser",
+			logItemErrors: false,
+		});
+
+		return Array.from(entriesByFile.values())
+			.filter((entry) => entry.item.type === "recipe" && entry.item.date)
+			.sort((a, b) =>
+				(a.item.date ?? "").localeCompare(b.item.date ?? "")
+			)
+			.map((entry) => {
+				const scheduledDate = entry.item.date ?? "";
+				const cookedDate = normalizeReviewDate(entry.item.date);
+				const coverUrl = resolveWeeklyOrganiserCoverImage(
+					app,
+					entry.item
+				);
+				return {
+					path: entry.filePath,
+					title: entry.item.title,
+					scheduledDate,
+					cookedDate,
+					coverUrl,
+					rating: "",
+					makeAgain: "",
+					notes: "",
+					include: true,
+				};
+			});
+	}, [app, config, normalizeReviewDate]);
+
+	React.useEffect(() => {
+		if (!isReviewOpen) return;
+		setReviewEntries(loadReviewEntries());
+	}, [isReviewOpen, loadReviewEntries]);
+
+	const updateReviewEntry = React.useCallback(
+		(path: string, updates: Partial<ReviewEntry>) => {
+			setReviewEntries((prev) =>
+				prev.map((entry) =>
+					entry.path === path ? { ...entry, ...updates } : entry
+				)
+			);
+		},
+		[]
 	);
 
 	const handleDrop = React.useCallback(
@@ -325,6 +412,111 @@ export const WeeklyOrganiserBoard = ({
 		});
 	}, [app, config, onSendShoppingList, weekOffset, weekRangeDisplay]);
 
+	const handleToggleReview = React.useCallback(() => {
+		if (isReviewOpen) {
+			setIsReviewOpen(false);
+			return;
+		}
+		setReviewEntries(loadReviewEntries());
+		setIsReviewOpen(true);
+	}, [isReviewOpen, loadReviewEntries]);
+
+	const handleCompleteWeek = React.useCallback(async () => {
+		if (isReviewSaving) return;
+
+		if (reviewEntries.length === 0) {
+			new Notice("No scheduled recipes found for this week.");
+			return;
+		}
+
+		const logCount = reviewEntries.filter(
+			(entry) => entry.include && entry.cookedDate.trim().length > 0
+		).length;
+		const confirmMessage =
+			logCount > 0
+				? `Save ${logCount} review${
+						logCount === 1 ? "" : "s"
+					} and clear scheduled recipes for ${weekRangeDisplay}?`
+				: `Clear scheduled recipes for ${weekRangeDisplay}?`;
+
+		if (!confirm(confirmMessage)) return;
+
+		setIsReviewSaving(true);
+		try {
+			let loggedCount = 0;
+			let clearedCount = 0;
+
+			for (const entry of reviewEntries) {
+				if (!entry.include) continue;
+				const cookedDate = entry.cookedDate.trim();
+				if (!cookedDate) continue;
+
+				const file = app.vault.getAbstractFileByPath(entry.path);
+				if (!(file instanceof TFile)) continue;
+
+				const ratingValue = entry.rating ? Number(entry.rating) : null;
+				const rating =
+					ratingValue !== null && Number.isNaN(ratingValue)
+						? null
+						: ratingValue;
+				const makeAgainValue =
+					entry.makeAgain === ""
+						? null
+						: entry.makeAgain === "yes";
+
+				const logEntry: CookLogEntryInput = {
+					cookedDate,
+					rating,
+					makeAgain: makeAgainValue,
+					notes: entry.notes,
+				};
+
+				try {
+					await appendCookLogEntryToFile(app, file, logEntry);
+					loggedCount += 1;
+				} catch (error) {
+					console.error("Failed to append cook log", {
+						path: entry.path,
+						error,
+					});
+				}
+			}
+
+			for (const entry of reviewEntries) {
+				const file = app.vault.getAbstractFileByPath(entry.path);
+				if (!(file instanceof TFile)) continue;
+				try {
+					await app.fileManager.processFrontMatter(
+						file,
+						(frontmatter) => {
+							delete frontmatter.scheduled;
+							delete frontmatter.date;
+						}
+					);
+					clearedCount += 1;
+				} catch (error) {
+					console.error("Failed to clear scheduled date", {
+						path: entry.path,
+						error,
+					});
+				}
+			}
+
+			new Notice(
+				`Logged ${loggedCount} recipe${
+					loggedCount === 1 ? "" : "s"
+				}, cleared ${clearedCount}.`
+			);
+			setIsReviewOpen(false);
+			setWeekOffset((prev) => prev + 1);
+		} catch (error) {
+			console.error("Weekly review failed", error);
+			new Notice("Weekly review failed. Check console for details.");
+		} finally {
+			setIsReviewSaving(false);
+		}
+	}, [app, isReviewSaving, reviewEntries, weekRangeDisplay]);
+
 	const handleCalendarSelect = React.useCallback((date: Date) => {
 		if (!date) return;
 		const selected = momentFn(date);
@@ -545,6 +737,24 @@ export const WeeklyOrganiserBoard = ({
 							</button>
 						</div>
 					)}
+					{isRecipePreset && (
+						<div className="topbar-action">
+							<button
+								className={`topbar-icon-btn${isReviewOpen ? " is-active" : ""}`}
+								type="button"
+								title="Review week"
+								aria-label="Review week"
+								aria-expanded={isReviewOpen}
+								onClick={handleToggleReview}
+							>
+								<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+									<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+									<rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+									<path d="m9 14 2 2 4-4" />
+								</svg>
+							</button>
+						</div>
+					)}
 					<div className="topbar-action">
 						<button
 							ref={filterButtonRef}
@@ -655,6 +865,154 @@ export const WeeklyOrganiserBoard = ({
 					</div>
 				</div>
 			</div>
+			{isReviewOpen && isRecipePreset && (
+				<div className="weekly-review-panel">
+					<div className="weekly-review-header">
+						<div className="weekly-review-heading">
+							<div className="weekly-review-title">Weekly review</div>
+							<div className="weekly-review-meta">{weekRangeDisplay}</div>
+						</div>
+					</div>
+					<div className="weekly-review-hint">
+						Log what you cooked this week. Uncheck a recipe to skip logging.
+					</div>
+					{reviewEntries.length === 0 ? (
+						<div className="weekly-review-empty">
+							No scheduled recipes for this week.
+						</div>
+					) : (
+						<div className="weekly-review-list">
+							{reviewEntries.map((entry) => (
+								<div
+									key={entry.path}
+									className={`weekly-review-row${
+										entry.include ? "" : " is-disabled"
+									}`}
+								>
+									<div className="weekly-review-row-header">
+										<div className="weekly-review-row-info">
+											{entry.coverUrl ? (
+												<div className="weekly-review-thumb">
+													<img
+														src={entry.coverUrl}
+														alt=""
+														loading="lazy"
+														aria-hidden="true"
+													/>
+												</div>
+											) : null}
+											<div className="weekly-review-row-title">
+												<div className="weekly-review-row-name">
+													{entry.title}
+												</div>
+												<div className="weekly-review-row-meta">
+													Planned {entry.scheduledDate}
+												</div>
+											</div>
+										</div>
+										<div className="weekly-review-row-controls">
+											<label className="weekly-review-inline weekly-review-inline--date">
+												<span>Date</span>
+												<input
+													type="date"
+													value={entry.cookedDate}
+													onChange={(event) =>
+														updateReviewEntry(entry.path, {
+															cookedDate: event.target.value,
+														})
+													}
+													disabled={isReviewSaving || !entry.include}
+												/>
+											</label>
+											<label className="weekly-review-inline weekly-review-inline--rating">
+												<span>Rate</span>
+												<select
+													value={entry.rating}
+													onChange={(event) =>
+														updateReviewEntry(entry.path, {
+															rating: event.target.value,
+														})
+													}
+													disabled={isReviewSaving || !entry.include}
+												>
+													<option value="">—</option>
+													<option value="1">1</option>
+													<option value="2">2</option>
+													<option value="3">3</option>
+													<option value="4">4</option>
+													<option value="5">5</option>
+												</select>
+											</label>
+											<label className="weekly-review-inline weekly-review-inline--again">
+												<span>Again</span>
+												<select
+													value={entry.makeAgain}
+													onChange={(event) =>
+														updateReviewEntry(entry.path, {
+															makeAgain: event.target.value as
+																| ""
+																| "yes"
+																| "no",
+														})
+													}
+													disabled={isReviewSaving || !entry.include}
+												>
+													<option value="">—</option>
+													<option value="yes">Yes</option>
+													<option value="no">No</option>
+												</select>
+											</label>
+										</div>
+										<label className="weekly-review-toggle">
+											<input
+												type="checkbox"
+												checked={entry.include}
+												onChange={(event) =>
+													updateReviewEntry(entry.path, {
+														include: event.target.checked,
+													})
+												}
+												disabled={isReviewSaving}
+											/>
+											<span>Cooked</span>
+										</label>
+									</div>
+									<label className="weekly-review-field weekly-review-field--notes">
+										<span>Notes</span>
+										<textarea
+											rows={2}
+											value={entry.notes}
+											onChange={(event) =>
+												updateReviewEntry(entry.path, {
+													notes: event.target.value,
+												})
+											}
+											disabled={isReviewSaving || !entry.include}
+										/>
+									</label>
+								</div>
+							))}
+						</div>
+					)}
+					<div className="weekly-review-actions">
+						<button
+							type="button"
+							onClick={() => setIsReviewOpen(false)}
+							disabled={isReviewSaving}
+						>
+							Close
+						</button>
+						<button
+							type="button"
+							className="mod-cta"
+							onClick={handleCompleteWeek}
+							disabled={isReviewSaving || reviewEntries.length === 0}
+						>
+							{isReviewSaving ? "Saving..." : "Save review & clear week"}
+						</button>
+					</div>
+				</div>
+			)}
 			<div
 				id={boardId}
 				ref={containerRef}
